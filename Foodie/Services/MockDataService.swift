@@ -1,0 +1,333 @@
+import Foundation
+
+class MockDataService: DataServiceProtocol {
+
+    // MARK: - Stable UUIDs so relationships stay consistent
+
+    static let currentUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let friend1Id     = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let friend2Id     = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    static let friend3Id     = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+
+    static let restaurant1Id = UUID(uuidString: "00000000-0000-0000-0001-000000000001")!
+    static let restaurant2Id = UUID(uuidString: "00000000-0000-0000-0001-000000000002")!
+    static let restaurant3Id = UUID(uuidString: "00000000-0000-0000-0001-000000000003")!
+    static let restaurant4Id = UUID(uuidString: "00000000-0000-0000-0001-000000000004")!
+    static let restaurant5Id = UUID(uuidString: "00000000-0000-0000-0001-000000000005")!
+    static let restaurant6Id = UUID(uuidString: "00000000-0000-0000-0001-000000000006")!
+    static let restaurant7Id = UUID(uuidString: "00000000-0000-0000-0001-000000000007")!
+    static let restaurant8Id = UUID(uuidString: "00000000-0000-0000-0001-000000000008")!
+
+    // MARK: - Users
+
+    lazy var users: [User] = [
+        User(
+            id: Self.currentUserId,
+            name: "Justin Reini",
+            username: "justineats",
+            profileImageName: "person.circle.fill",
+            bio: "Always hunting for the best tacos in town.",
+            joinDate: date(2025, 1, 15),
+            friendIds: [Self.friend1Id, Self.friend2Id, Self.friend3Id]
+        ),
+        User(
+            id: Self.friend1Id,
+            name: "Mia Chen",
+            username: "miabites",
+            profileImageName: "person.circle.fill",
+            bio: "Sushi snob & coffee addict.",
+            joinDate: date(2025, 2, 3),
+            friendIds: [Self.currentUserId, Self.friend2Id]
+        ),
+        User(
+            id: Self.friend2Id,
+            name: "Alex Rivera",
+            username: "alexfoodie",
+            profileImageName: "person.circle.fill",
+            bio: "Will drive 2 hours for good BBQ.",
+            joinDate: date(2025, 3, 20),
+            friendIds: [Self.currentUserId, Self.friend1Id, Self.friend3Id]
+        ),
+        User(
+            id: Self.friend3Id,
+            name: "Sam Patel",
+            username: "samcooks",
+            profileImageName: "person.circle.fill",
+            bio: "Home cook by day, restaurant explorer by night.",
+            joinDate: date(2025, 4, 10),
+            friendIds: [Self.currentUserId, Self.friend2Id]
+        ),
+    ]
+
+    // MARK: - Restaurants
+
+    lazy var restaurants: [Restaurant] = [
+        Restaurant(
+            id: Self.restaurant1Id,
+            name: "Sakura Sushi",
+            cuisineType: "Japanese",
+            address: "123 Cherry Blossom Ln",
+            latitude: 34.0522, longitude: -118.2437,
+            averageRating: 4.5, priceLevel: 3,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "11 AM – 10 PM",
+            tags: ["date night", "fresh fish", "sake bar"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant2Id,
+            name: "Taco Libre",
+            cuisineType: "Mexican",
+            address: "456 Fiesta Ave",
+            latitude: 34.0195, longitude: -118.4912,
+            averageRating: 4.8, priceLevel: 1,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "9 AM – 11 PM",
+            tags: ["casual", "street food", "spicy"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant3Id,
+            name: "Bella Napoli",
+            cuisineType: "Italian",
+            address: "789 Olive Garden Dr",
+            latitude: 34.0407, longitude: -118.2468,
+            averageRating: 4.2, priceLevel: 3,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "12 PM – 10 PM",
+            tags: ["romantic", "wine list", "pasta"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant4Id,
+            name: "Smokey Joe's BBQ",
+            cuisineType: "BBQ",
+            address: "321 Hickory Smoke Rd",
+            latitude: 34.0622, longitude: -118.3050,
+            averageRating: 4.6, priceLevel: 2,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "11 AM – 9 PM",
+            tags: ["casual", "smoked meats", "family friendly"],
+            isOpenNow: false
+        ),
+        Restaurant(
+            id: Self.restaurant5Id,
+            name: "Golden Dragon",
+            cuisineType: "Chinese",
+            address: "555 Dynasty Blvd",
+            latitude: 34.0553, longitude: -118.2498,
+            averageRating: 4.0, priceLevel: 2,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "10 AM – 10 PM",
+            tags: ["dim sum", "family style", "late night"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant6Id,
+            name: "Café Parisien",
+            cuisineType: "French",
+            address: "88 Rue de la Paix",
+            latitude: 34.0481, longitude: -118.2590,
+            averageRating: 4.7, priceLevel: 4,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "8 AM – 11 PM",
+            tags: ["fine dining", "brunch", "pastries"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant7Id,
+            name: "Bombay Spice",
+            cuisineType: "Indian",
+            address: "42 Curry Lane",
+            latitude: 34.0390, longitude: -118.2660,
+            averageRating: 4.3, priceLevel: 2,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "11 AM – 10 PM",
+            tags: ["spicy", "vegetarian options", "cozy"],
+            isOpenNow: true
+        ),
+        Restaurant(
+            id: Self.restaurant8Id,
+            name: "Seoul Kitchen",
+            cuisineType: "Korean",
+            address: "77 Kimchi St",
+            latitude: 34.0620, longitude: -118.3089,
+            averageRating: 4.4, priceLevel: 2,
+            imageName: "fork.knife.circle.fill",
+            hoursDescription: "11 AM – 10 PM",
+            tags: ["KBBQ", "trendy", "group friendly"],
+            isOpenNow: false
+        ),
+    ]
+
+    // MARK: - Reviews
+
+    lazy var reviews: [Review] = [
+        Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant1Id,
+               rating: 5, text: "Best omakase I've ever had. The salmon was insane.",
+               moodTags: ["romantic", "special occasion"], photoNames: [], createdAt: hoursAgo(2)),
+        Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant2Id,
+               rating: 5, text: "The al pastor tacos are life-changing. Cash only but worth it!",
+               moodTags: ["casual", "late night"], photoNames: [], createdAt: hoursAgo(5)),
+        Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant3Id,
+               rating: 4, text: "Incredible cacio e pepe. Service was a tad slow.",
+               moodTags: ["date night", "cozy"], photoNames: [], createdAt: hoursAgo(8)),
+        Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant4Id,
+               rating: 5, text: "Brisket melts in your mouth. Get the mac and cheese too.",
+               moodTags: ["casual", "comfort food"], photoNames: [], createdAt: daysAgo(1)),
+        Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant5Id,
+               rating: 4, text: "Solid dim sum. Go early on weekends to avoid the wait.",
+               moodTags: ["family", "brunch"], photoNames: [], createdAt: daysAgo(1)),
+        Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant6Id,
+               rating: 5, text: "Felt like I was in Paris. The croissants are flaky perfection.",
+               moodTags: ["romantic", "brunch"], photoNames: [], createdAt: daysAgo(2)),
+        Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant7Id,
+               rating: 4, text: "Butter chicken here is legit. Naan is fresh out of the tandoor.",
+               moodTags: ["cozy", "spicy"], photoNames: [], createdAt: daysAgo(2)),
+        Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant8Id,
+               rating: 4, text: "Great KBBQ spot for groups. Unlimited meat for a fair price.",
+               moodTags: ["group friendly", "fun"], photoNames: [], createdAt: daysAgo(3)),
+        Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant3Id,
+               rating: 5, text: "Came back for the tiramisu. Did not disappoint.",
+               moodTags: ["date night", "dessert"], photoNames: [], createdAt: daysAgo(4)),
+        Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant2Id,
+               rating: 5, text: "Third visit this month. The horchata is addictive.",
+               moodTags: ["casual", "quick bite"], photoNames: [], createdAt: daysAgo(5)),
+        Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant8Id,
+               rating: 5, text: "Best Korean fried chicken in the city. Order extra sauce.",
+               moodTags: ["trendy", "late night"], photoNames: [], createdAt: daysAgo(6)),
+        Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant1Id,
+               rating: 4, text: "Sashimi was super fresh. A bit pricey but worth a splurge.",
+               moodTags: ["special occasion", "fresh"], photoNames: [], createdAt: daysAgo(7)),
+    ]
+
+    // MARK: - Bucket List
+
+    lazy var bucketListEntries: [BucketListEntry] = [
+        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant6Id,
+                        dateAdded: daysAgo(3), notes: "Need to try the tasting menu"),
+        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant8Id,
+                        dateAdded: daysAgo(5), notes: "Sam says the KBBQ is amazing"),
+        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant1Id,
+                        dateAdded: daysAgo(10), notes: "Omakase night with Mia"),
+        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant5Id,
+                        dateAdded: daysAgo(14), notes: "Dim sum brunch this weekend?"),
+        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant3Id,
+                        dateAdded: daysAgo(20), notes: "Heard the pasta is incredible"),
+    ]
+
+    // MARK: - Liked restaurant IDs (restaurants the current user has positively rated)
+
+    lazy var likedRestaurantIds: [UUID] = [
+        Self.restaurant2Id,
+        Self.restaurant4Id,
+        Self.restaurant7Id,
+    ]
+
+    // MARK: - Activity Feed (pre-built from reviews + other actions)
+
+    lazy var activityFeed: [FriendActivity] = {
+        var activities: [FriendActivity] = []
+
+        // Turn friend reviews into activity items
+        for review in reviews where review.userId != Self.currentUserId {
+            guard let user = users.first(where: { $0.id == review.userId }),
+                  let restaurant = restaurants.first(where: { $0.id == review.restaurantId }) else { continue }
+            activities.append(FriendActivity(
+                id: UUID(), user: user, restaurant: restaurant,
+                activityType: .review, timestamp: review.createdAt,
+                associatedReview: review
+            ))
+        }
+
+        // Sprinkle in some non-review activities
+        if let mia = users.first(where: { $0.id == Self.friend1Id }),
+           let taco = restaurants.first(where: { $0.id == Self.restaurant2Id }) {
+            activities.append(FriendActivity(
+                id: UUID(), user: mia, restaurant: taco,
+                activityType: .checkIn, timestamp: hoursAgo(1),
+                associatedReview: nil
+            ))
+        }
+
+        if let alex = users.first(where: { $0.id == Self.friend2Id }),
+           let bombay = restaurants.first(where: { $0.id == Self.restaurant7Id }) {
+            activities.append(FriendActivity(
+                id: UUID(), user: alex, restaurant: bombay,
+                activityType: .addedToBucketList, timestamp: hoursAgo(3),
+                associatedReview: nil
+            ))
+        }
+
+        if let sam = users.first(where: { $0.id == Self.friend3Id }),
+           let cafe = restaurants.first(where: { $0.id == Self.restaurant6Id }) {
+            activities.append(FriendActivity(
+                id: UUID(), user: sam, restaurant: cafe,
+                activityType: .liked, timestamp: hoursAgo(6),
+                associatedReview: nil
+            ))
+        }
+
+        return activities.sorted { $0.timestamp > $1.timestamp }
+    }()
+
+    // MARK: - Protocol Methods
+
+    func fetchCurrentUser() -> User {
+        users.first(where: { $0.id == Self.currentUserId })!
+    }
+
+    func fetchAllUsers() -> [User] {
+        users
+    }
+
+    func fetchFriends(for userId: UUID) -> [User] {
+        guard let user = users.first(where: { $0.id == userId }) else { return [] }
+        return users.filter { user.friendIds.contains($0.id) }
+    }
+
+    func fetchAllRestaurants() -> [Restaurant] {
+        restaurants
+    }
+
+    func fetchRestaurant(by id: UUID) -> Restaurant? {
+        restaurants.first(where: { $0.id == id })
+    }
+
+    func fetchReviews(for restaurantId: UUID) -> [Review] {
+        reviews.filter { $0.restaurantId == restaurantId }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func fetchReviews(by userId: UUID) -> [Review] {
+        reviews.filter { $0.userId == userId }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func fetchBucketList(for userId: UUID) -> [BucketListEntry] {
+        bucketListEntries.filter { $0.userId == userId }
+            .sorted { $0.dateAdded > $1.dateAdded }
+    }
+
+    func fetchActivityFeed(for userId: UUID) -> [FriendActivity] {
+        activityFeed
+    }
+
+    func fetchLikedRestaurantIds(for userId: UUID) -> [UUID] {
+        likedRestaurantIds
+    }
+
+    // MARK: - Date Helpers
+
+    private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
+    private func hoursAgo(_ hours: Int) -> Date {
+        Date().addingTimeInterval(-Double(hours) * 3600)
+    }
+
+    private func daysAgo(_ days: Int) -> Date {
+        Date().addingTimeInterval(-Double(days) * 86400)
+    }
+}
