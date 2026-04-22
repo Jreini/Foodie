@@ -6,7 +6,7 @@ class ProfileViewModel {
     var currentUser: User?
     var userReviews: [Review] = []
     var likedRestaurants: [Restaurant] = []
-    var bucketListRestaurants: [Restaurant] = []
+    var tastingListRestaurants: [Restaurant] = []
     var allRestaurants: [Restaurant] = []
 
     // Tracks which segment is selected in the profile
@@ -15,12 +15,12 @@ class ProfileViewModel {
     enum ProfileSegment: String, CaseIterable {
         case reviews = "Reviews"
         case liked = "Liked"
-        case bucketList = "Bucket List"
+        case tastingList = "Tasting List"
     }
 
     var reviewCount: Int { userReviews.count }
     var friendCount: Int { currentUser?.friendCount ?? 0 }
-    var bucketListCount: Int { bucketListRestaurants.count }
+    var tastingListCount: Int { tastingListRestaurants.count }
 
     private let dataService: DataServiceProtocol
 
@@ -38,9 +38,9 @@ class ProfileViewModel {
         let likedIds = dataService.fetchLikedRestaurantIds(for: user.id)
         likedRestaurants = allRestaurants.filter { likedIds.contains($0.id) }
 
-        let bucketEntries = dataService.fetchBucketList(for: user.id)
-        let bucketIds = bucketEntries.map { $0.restaurantId }
-        bucketListRestaurants = allRestaurants.filter { bucketIds.contains($0.id) }
+        let tastingEntries = dataService.fetchTastingList(for: user.id)
+        let tastingIds = tastingEntries.map { $0.restaurantId }
+        tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
     }
 
     func restaurantForReview(_ review: Review) -> Restaurant? {

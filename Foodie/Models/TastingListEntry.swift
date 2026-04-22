@@ -1,6 +1,6 @@
 import Foundation
 
-struct BucketListEntry: Identifiable, Hashable {
+struct TastingListEntry: Identifiable, Hashable {
     let id: UUID
     let userId: UUID
     let restaurantId: UUID

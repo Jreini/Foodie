@@ -201,19 +201,19 @@ class MockDataService: DataServiceProtocol {
                moodTags: ["special occasion", "fresh"], photoNames: [], createdAt: daysAgo(7)),
     ]
 
-    // MARK: - Bucket List
+    // MARK: - Tasting List
 
-    lazy var bucketListEntries: [BucketListEntry] = [
-        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant6Id,
-                        dateAdded: daysAgo(3), notes: "Need to try the tasting menu"),
-        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant8Id,
-                        dateAdded: daysAgo(5), notes: "Sam says the KBBQ is amazing"),
-        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant1Id,
-                        dateAdded: daysAgo(10), notes: "Omakase night with Mia"),
-        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant5Id,
-                        dateAdded: daysAgo(14), notes: "Dim sum brunch this weekend?"),
-        BucketListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant3Id,
-                        dateAdded: daysAgo(20), notes: "Heard the pasta is incredible"),
+    lazy var tastingListEntries: [TastingListEntry] = [
+        TastingListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant6Id,
+                         dateAdded: daysAgo(3), notes: "Need to try the tasting menu"),
+        TastingListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant8Id,
+                         dateAdded: daysAgo(5), notes: "Sam says the KBBQ is amazing"),
+        TastingListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant1Id,
+                         dateAdded: daysAgo(10), notes: "Omakase night with Mia"),
+        TastingListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant5Id,
+                         dateAdded: daysAgo(14), notes: "Dim sum brunch this weekend?"),
+        TastingListEntry(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant3Id,
+                         dateAdded: daysAgo(20), notes: "Heard the pasta is incredible"),
     ]
 
     // MARK: - Liked restaurant IDs (restaurants the current user has positively rated)
@@ -254,7 +254,7 @@ class MockDataService: DataServiceProtocol {
            let bombay = restaurants.first(where: { $0.id == Self.restaurant7Id }) {
             activities.append(FriendActivity(
                 id: UUID(), user: alex, restaurant: bombay,
-                activityType: .addedToBucketList, timestamp: hoursAgo(3),
+                activityType: .addedToTastingList, timestamp: hoursAgo(3),
                 associatedReview: nil
             ))
         }
@@ -304,8 +304,8 @@ class MockDataService: DataServiceProtocol {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    func fetchBucketList(for userId: UUID) -> [BucketListEntry] {
-        bucketListEntries.filter { $0.userId == userId }
+    func fetchTastingList(for userId: UUID) -> [TastingListEntry] {
+        tastingListEntries.filter { $0.userId == userId }
             .sorted { $0.dateAdded > $1.dateAdded }
     }
 

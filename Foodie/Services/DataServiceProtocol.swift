@@ -12,7 +12,7 @@ protocol DataServiceProtocol {
     func fetchReviews(for restaurantId: UUID) -> [Review]
     func fetchReviews(by userId: UUID) -> [Review]
 
-    func fetchBucketList(for userId: UUID) -> [BucketListEntry]
+    func fetchTastingList(for userId: UUID) -> [TastingListEntry]
     func fetchActivityFeed(for userId: UUID) -> [FriendActivity]
 
     func fetchLikedRestaurantIds(for userId: UUID) -> [UUID]

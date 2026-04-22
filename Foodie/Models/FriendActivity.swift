@@ -3,7 +3,7 @@ import Foundation
 enum ActivityType: String, Hashable, CaseIterable {
     case review = "reviewed"
     case checkIn = "checked in at"
-    case addedToBucketList = "added to bucket list"
+    case addedToTastingList = "added to tasting list"
     case liked = "liked"
 }
 

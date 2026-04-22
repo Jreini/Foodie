@@ -71,7 +71,7 @@ struct ProfileView: View {
             HStack(spacing: AppTheme.spacingXXL) {
                 profileStat(count: viewModel.reviewCount, label: "Reviews")
                 profileStat(count: viewModel.friendCount, label: "Friends")
-                profileStat(count: viewModel.bucketListCount, label: "Bucket List")
+                profileStat(count: viewModel.tastingListCount, label: "Tasting List")
             }
             .padding(.top, AppTheme.spacingSM)
         }
@@ -106,8 +106,8 @@ struct ProfileView: View {
             reviewsList
         case .liked:
             likedList
-        case .bucketList:
-            bucketList
+        case .tastingList:
+            tastingList
         }
     }
 
@@ -171,12 +171,12 @@ struct ProfileView: View {
         }
     }
 
-    private var bucketList: some View {
+    private var tastingList: some View {
         LazyVStack(spacing: AppTheme.spacingSM) {
-            if viewModel.bucketListRestaurants.isEmpty {
-                emptySegmentView(icon: "bookmark", message: "Bucket list is empty")
+            if viewModel.tastingListRestaurants.isEmpty {
+                emptySegmentView(icon: "bookmark", message: "Tasting list is empty")
             } else {
-                ForEach(viewModel.bucketListRestaurants) { restaurant in
+                ForEach(viewModel.tastingListRestaurants) { restaurant in
                     NavigationLink(value: restaurant) {
                         RestaurantRowView(restaurant: restaurant)
                             .padding(.horizontal, AppTheme.spacingLG)

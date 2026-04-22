@@ -1,16 +1,18 @@
 import SwiftUI
 
-struct DiscoverTogetherView: View {
+struct DiscoverNewTasteView: View {
     @State private var viewModel = DecisionEngineViewModel()
     @State private var selectedFriendIds: Set<UUID> = []
     @State private var result: Restaurant? = nil
     @State private var hasSearched = false
 
+    private var isSolo: Bool { selectedFriendIds.isEmpty }
+
     var body: some View {
         VStack(spacing: AppTheme.spacingLG) {
-            // Friend selector
+            // Friend selector (optional — empty means solo discovery)
             VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
-                Text("Who's exploring?")
+                Text("Who's exploring? (optional)")
                     .font(.headline)
                     .padding(.horizontal, AppTheme.spacingLG)
 
@@ -27,60 +29,63 @@ struct DiscoverTogetherView: View {
             Divider()
                 .padding(.horizontal, AppTheme.spacingLG)
 
-            // Result
+            // Result area
             Spacer()
             if let restaurant = result {
                 discoveryResultView(restaurant)
             } else if hasSearched {
-                Text("No undiscovered spots found. You've been everywhere!")
+                Text("No undiscovered spots found. You've tried everything!")
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding()
             } else {
-                VStack(spacing: AppTheme.spacingSM) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 48))
-                        .foregroundStyle(AppTheme.primaryColor.opacity(0.4))
-
-                    Text("Find a new place nobody\nin the group has tried")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
+                emptyPrompt
             }
             Spacer()
 
-            // Action button
+            // Action button — label adapts to solo vs group mode
             Button {
                 withAnimation {
-                    result = viewModel.discoverForGroup(selectedFriendIds: Array(selectedFriendIds))
+                    result = viewModel.discoverNewTaste(
+                        selectedFriendIds: Array(selectedFriendIds)
+                    )
                     hasSearched = true
                 }
             } label: {
-                Label("Discover Together", systemImage: "sparkles")
+                Label("Discover a New Taste", systemImage: "sparkles")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppTheme.spacingMD)
-                    .background(
-                        selectedFriendIds.isEmpty
-                            ? Color.gray.opacity(0.3)
-                            : AppTheme.primaryColor
-                    )
+                    .background(AppTheme.primaryColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusMD))
             }
-            .disabled(selectedFriendIds.isEmpty)
             .padding(.horizontal, AppTheme.spacingLG)
             .padding(.bottom, AppTheme.spacingXL)
         }
         .background(AppTheme.screenBackground)
-        .navigationTitle("Discover Together")
+        .navigationTitle("Discover a New Taste")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { viewModel.loadData() }
     }
 
     // MARK: - Subviews
+
+    private var emptyPrompt: some View {
+        VStack(spacing: AppTheme.spacingSM) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 48))
+                .foregroundStyle(AppTheme.primaryColor.opacity(0.4))
+
+            Text(isSolo
+                 ? "Find a new spot you\nhaven't tried yet"
+                 : "Find a new place nobody\nin the group has tried")
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+    }
 
     private func friendChip(_ friend: User) -> some View {
         let isSelected = selectedFriendIds.contains(friend.id)
@@ -147,6 +152,6 @@ struct DiscoverTogetherView: View {
 
 #Preview {
     NavigationStack {
-        DiscoverTogetherView()
+        DiscoverNewTasteView()
     }
 }

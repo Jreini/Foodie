@@ -10,41 +10,31 @@ struct DecisionEngineView: View {
                         .foregroundStyle(AppTheme.textSecondary)
                         .padding(.top, AppTheme.spacingSM)
 
-                    // Four decision option cards
-                    NavigationLink(destination: PickForMeView()) {
+                    // Three consolidated decision option cards
+                    NavigationLink(destination: RollTheDiceView()) {
                         DecisionOptionCard(
-                            title: "Pick for Me",
-                            subtitle: "Random pick from your liked places & bucket list",
+                            title: "Roll the Dice",
+                            subtitle: "Random pick for just you or the whole group",
                             iconName: "dice.fill",
                             gradientColors: [Color.orange, Color.red]
                         )
                     }
                     .buttonStyle(.plain)
 
-                    NavigationLink(destination: PickForUsView()) {
+                    NavigationLink(destination: DiscoverNewTasteView()) {
                         DecisionOptionCard(
-                            title: "Pick for Us",
-                            subtitle: "Find the best overlap between you and your friends",
-                            iconName: "person.2.fill",
-                            gradientColors: [Color.purple, Color.indigo]
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    NavigationLink(destination: DiscoverTogetherView()) {
-                        DecisionOptionCard(
-                            title: "Discover Together",
-                            subtitle: "A new spot nobody in the group has tried",
+                            title: "Discover a New Taste",
+                            subtitle: "Somewhere new — solo or with a group",
                             iconName: "sparkles",
                             gradientColors: [Color.teal, Color.blue]
                         )
                     }
                     .buttonStyle(.plain)
 
-                    NavigationLink(destination: BucketListView()) {
+                    NavigationLink(destination: TastingListView()) {
                         DecisionOptionCard(
-                            title: "My Bucket List",
-                            subtitle: "Browse and pick from your saved spots",
+                            title: "My Tasting List",
+                            subtitle: "Browse, add, and pick from your saved spots",
                             iconName: "bookmark.fill",
                             gradientColors: [Color.pink, Color.orange]
                         )

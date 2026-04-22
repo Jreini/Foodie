@@ -4,7 +4,7 @@ import Observation
 @Observable
 class DecisionEngineViewModel {
     var likedRestaurants: [Restaurant] = []
-    var bucketListRestaurants: [Restaurant] = []
+    var tastingListRestaurants: [Restaurant] = []
     var allRestaurants: [Restaurant] = []
     var friends: [User] = []
     // The result after a "pick" action
@@ -26,15 +26,15 @@ class DecisionEngineViewModel {
         let likedIds = dataService.fetchLikedRestaurantIds(for: currentUser.id)
         likedRestaurants = allRestaurants.filter { likedIds.contains($0.id) }
 
-        // Build bucket list restaurants
-        let bucketEntries = dataService.fetchBucketList(for: currentUser.id)
-        let bucketIds = bucketEntries.map { $0.restaurantId }
-        bucketListRestaurants = allRestaurants.filter { bucketIds.contains($0.id) }
+        // Build tasting list restaurants
+        let tastingEntries = dataService.fetchTastingList(for: currentUser.id)
+        let tastingIds = tastingEntries.map { $0.restaurantId }
+        tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
     }
 
-    // Picks a random restaurant from liked places + bucket list combined
+    // Picks a random restaurant from liked places + tasting list combined
     func pickRandomForMe() {
-        let pool = Array(Set(likedRestaurants + bucketListRestaurants))
+        let pool = Array(Set(likedRestaurants + tastingListRestaurants))
         guard !pool.isEmpty else { return }
         isAnimatingPick = true
 
@@ -45,27 +45,44 @@ class DecisionEngineViewModel {
         }
     }
 
-    // Finds restaurants that overlap across selected friends' liked + bucket list
-    // For mock data, returns restaurants liked by at least one friend from the pool
+    // Roll the Dice for a group: mock-picks a random spot the group might overlap on
+    // For real data this would aggregate each friend's likes + tasting list
     func pickForGroup(selectedFriendIds: [UUID]) -> Restaurant? {
         guard !selectedFriendIds.isEmpty else { return nil }
 
-        // In a real app this would aggregate each friend's likes/bucket list
-        // For now, pick a random restaurant from the full pool as a stand-in
-        let pool = allRestaurants
-        return pool.randomElement()
+        // Include the user's own pool as the overlap seed
+        let pool = Array(Set(likedRestaurants + tastingListRestaurants))
+        return (pool.isEmpty ? allRestaurants : pool).randomElement()
+    }
+
+    // Animated version of group pick used by Roll the Dice
+    func rollForGroup(selectedFriendIds: [UUID]) {
+        guard !selectedFriendIds.isEmpty else { return }
+        isAnimatingPick = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
+            pickedRestaurant = pickForGroup(selectedFriendIds: selectedFriendIds)
+            isAnimatingPick = false
+        }
     }
 
     // Suggests a restaurant nobody in the group has visited
-    func discoverForGroup(selectedFriendIds: [UUID]) -> Restaurant? {
+    // When selectedFriendIds is empty, acts as a solo "discover a new taste"
+    func discoverNewTaste(selectedFriendIds: [UUID] = []) -> Restaurant? {
         // In a real app, exclude places anyone in the group has reviewed
-        // For mock: pick randomly from all restaurants
-        let visitedIds = Set(likedRestaurants.map { $0.id } + bucketListRestaurants.map { $0.id })
+        // For mock: exclude the user's liked + tasting list restaurants
+        let visitedIds = Set(likedRestaurants.map { $0.id } + tastingListRestaurants.map { $0.id })
         let unvisited = allRestaurants.filter { !visitedIds.contains($0.id) }
         return unvisited.randomElement() ?? allRestaurants.randomElement()
     }
 
-    func pickRandomFromBucketList() -> Restaurant? {
-        bucketListRestaurants.randomElement()
+    func pickRandomFromTastingList() -> Restaurant? {
+        tastingListRestaurants.randomElement()
+    }
+
+    // Resets animation + prior picks (e.g. when switching Solo/Group mode)
+    func resetPick() {
+        pickedRestaurant = nil
+        isAnimatingPick = false
     }
 }

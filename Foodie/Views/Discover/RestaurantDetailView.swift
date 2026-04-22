@@ -4,7 +4,7 @@ struct RestaurantDetailView: View {
     let restaurant: Restaurant
     @State private var reviews: [Review] = []
     @State private var showWriteReview = false
-    @State private var addedToBucketList = false
+    @State private var addedToTastingList = false
 
     private let dataService: DataServiceProtocol = MockDataService()
 
@@ -109,20 +109,20 @@ struct RestaurantDetailView: View {
 
     private var actionButtonsSection: some View {
         HStack(spacing: AppTheme.spacingMD) {
-            // Add to bucket list button
+            // Add to tasting list button
             Button {
-                withAnimation { addedToBucketList.toggle() }
+                withAnimation { addedToTastingList.toggle() }
             } label: {
                 Label(
-                    addedToBucketList ? "On Bucket List" : "Bucket List",
-                    systemImage: addedToBucketList ? "bookmark.fill" : "bookmark"
+                    addedToTastingList ? "On Tasting List" : "Tasting List",
+                    systemImage: addedToTastingList ? "bookmark.fill" : "bookmark"
                 )
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, AppTheme.spacingMD)
-                .background(addedToBucketList ? AppTheme.primaryColor : AppTheme.tagBackground)
-                .foregroundStyle(addedToBucketList ? .white : AppTheme.textPrimary)
+                .background(addedToTastingList ? AppTheme.primaryColor : AppTheme.tagBackground)
+                .foregroundStyle(addedToTastingList ? .white : AppTheme.textPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
             }
 
