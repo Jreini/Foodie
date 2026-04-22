@@ -72,7 +72,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "11 AM – 10 PM",
             tags: ["date night", "fresh fish", "sake bar"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Upscale sushi — sits between casual and fine dining
+            baselineTier: RestaurantTier(0.72),
+            averageTier: RestaurantTier(0.72)
         ),
         Restaurant(
             id: Self.restaurant2Id,
@@ -84,7 +87,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "9 AM – 11 PM",
             tags: ["casual", "street food", "spicy"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Quick street food — squarely fast-casual
+            baselineTier: RestaurantTier(0.20),
+            averageTier: RestaurantTier(0.20)
         ),
         Restaurant(
             id: Self.restaurant3Id,
@@ -96,7 +102,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "12 PM – 10 PM",
             tags: ["romantic", "wine list", "pasta"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Romantic Italian with a wine list — upscale casual
+            baselineTier: RestaurantTier(0.68),
+            averageTier: RestaurantTier(0.68)
         ),
         Restaurant(
             id: Self.restaurant4Id,
@@ -108,7 +117,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "11 AM – 9 PM",
             tags: ["casual", "smoked meats", "family friendly"],
-            isOpenNow: false
+            isOpenNow: false,
+            // Classic casual dining
+            baselineTier: RestaurantTier(0.50),
+            averageTier: RestaurantTier(0.50)
         ),
         Restaurant(
             id: Self.restaurant5Id,
@@ -120,7 +132,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "10 AM – 10 PM",
             tags: ["dim sum", "family style", "late night"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Family-style casual dining
+            baselineTier: RestaurantTier(0.45),
+            averageTier: RestaurantTier(0.45)
         ),
         Restaurant(
             id: Self.restaurant6Id,
@@ -132,7 +147,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "8 AM – 11 PM",
             tags: ["fine dining", "brunch", "pastries"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Tagged fine dining in the source data
+            baselineTier: RestaurantTier(0.92),
+            averageTier: RestaurantTier(0.92)
         ),
         Restaurant(
             id: Self.restaurant7Id,
@@ -144,7 +162,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "11 AM – 10 PM",
             tags: ["spicy", "vegetarian options", "cozy"],
-            isOpenNow: true
+            isOpenNow: true,
+            // Cozy neighborhood casual
+            baselineTier: RestaurantTier(0.48),
+            averageTier: RestaurantTier(0.48)
         ),
         Restaurant(
             id: Self.restaurant8Id,
@@ -156,7 +177,10 @@ class MockDataService: DataServiceProtocol {
             imageName: "fork.knife.circle.fill",
             hoursDescription: "11 AM – 10 PM",
             tags: ["KBBQ", "trendy", "group friendly"],
-            isOpenNow: false
+            isOpenNow: false,
+            // Trendy group spot — between casual and upscale
+            baselineTier: RestaurantTier(0.55),
+            averageTier: RestaurantTier(0.55)
         ),
     ]
 
@@ -165,40 +189,52 @@ class MockDataService: DataServiceProtocol {
     lazy var reviews: [Review] = [
         Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant1Id,
                rating: 5, text: "Best omakase I've ever had. The salmon was insane.",
-               moodTags: ["romantic", "special occasion"], photoNames: [], createdAt: hoursAgo(2)),
+               moodTags: ["romantic", "special occasion"], photoNames: [],
+               createdAt: hoursAgo(2), tierPlacement: RestaurantTier(0.75)),
         Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant2Id,
                rating: 5, text: "The al pastor tacos are life-changing. Cash only but worth it!",
-               moodTags: ["casual", "late night"], photoNames: [], createdAt: hoursAgo(5)),
+               moodTags: ["casual", "late night"], photoNames: [],
+               createdAt: hoursAgo(5), tierPlacement: RestaurantTier(0.18)),
         Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant3Id,
                rating: 4, text: "Incredible cacio e pepe. Service was a tad slow.",
-               moodTags: ["date night", "cozy"], photoNames: [], createdAt: hoursAgo(8)),
+               moodTags: ["date night", "cozy"], photoNames: [],
+               createdAt: hoursAgo(8), tierPlacement: RestaurantTier(0.66)),
         Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant4Id,
                rating: 5, text: "Brisket melts in your mouth. Get the mac and cheese too.",
-               moodTags: ["casual", "comfort food"], photoNames: [], createdAt: daysAgo(1)),
+               moodTags: ["casual", "comfort food"], photoNames: [],
+               createdAt: daysAgo(1), tierPlacement: RestaurantTier(0.52)),
         Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant5Id,
                rating: 4, text: "Solid dim sum. Go early on weekends to avoid the wait.",
-               moodTags: ["family", "brunch"], photoNames: [], createdAt: daysAgo(1)),
+               moodTags: ["family", "brunch"], photoNames: [],
+               createdAt: daysAgo(1), tierPlacement: RestaurantTier(0.43)),
         Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant6Id,
                rating: 5, text: "Felt like I was in Paris. The croissants are flaky perfection.",
-               moodTags: ["romantic", "brunch"], photoNames: [], createdAt: daysAgo(2)),
+               moodTags: ["romantic", "brunch"], photoNames: [],
+               createdAt: daysAgo(2), tierPlacement: RestaurantTier(0.94)),
         Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant7Id,
                rating: 4, text: "Butter chicken here is legit. Naan is fresh out of the tandoor.",
-               moodTags: ["cozy", "spicy"], photoNames: [], createdAt: daysAgo(2)),
+               moodTags: ["cozy", "spicy"], photoNames: [],
+               createdAt: daysAgo(2), tierPlacement: RestaurantTier(0.46)),
         Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant8Id,
                rating: 4, text: "Great KBBQ spot for groups. Unlimited meat for a fair price.",
-               moodTags: ["group friendly", "fun"], photoNames: [], createdAt: daysAgo(3)),
+               moodTags: ["group friendly", "fun"], photoNames: [],
+               createdAt: daysAgo(3), tierPlacement: RestaurantTier(0.53)),
         Review(id: UUID(), userId: Self.friend1Id, restaurantId: Self.restaurant3Id,
                rating: 5, text: "Came back for the tiramisu. Did not disappoint.",
-               moodTags: ["date night", "dessert"], photoNames: [], createdAt: daysAgo(4)),
+               moodTags: ["date night", "dessert"], photoNames: [],
+               createdAt: daysAgo(4), tierPlacement: RestaurantTier(0.70)),
         Review(id: UUID(), userId: Self.currentUserId, restaurantId: Self.restaurant2Id,
                rating: 5, text: "Third visit this month. The horchata is addictive.",
-               moodTags: ["casual", "quick bite"], photoNames: [], createdAt: daysAgo(5)),
+               moodTags: ["casual", "quick bite"], photoNames: [],
+               createdAt: daysAgo(5), tierPlacement: RestaurantTier(0.22)),
         Review(id: UUID(), userId: Self.friend2Id, restaurantId: Self.restaurant8Id,
                rating: 5, text: "Best Korean fried chicken in the city. Order extra sauce.",
-               moodTags: ["trendy", "late night"], photoNames: [], createdAt: daysAgo(6)),
+               moodTags: ["trendy", "late night"], photoNames: [],
+               createdAt: daysAgo(6), tierPlacement: RestaurantTier(0.57)),
         Review(id: UUID(), userId: Self.friend3Id, restaurantId: Self.restaurant1Id,
                rating: 4, text: "Sashimi was super fresh. A bit pricey but worth a splurge.",
-               moodTags: ["special occasion", "fresh"], photoNames: [], createdAt: daysAgo(7)),
+               moodTags: ["special occasion", "fresh"], photoNames: [],
+               createdAt: daysAgo(7), tierPlacement: RestaurantTier(0.70)),
     ]
 
     // MARK: - Tasting List
@@ -287,11 +323,26 @@ class MockDataService: DataServiceProtocol {
     }
 
     func fetchAllRestaurants() -> [Restaurant] {
-        restaurants
+        restaurants.map(withRecomputedAverageTier)
     }
 
     func fetchRestaurant(by id: UUID) -> Restaurant? {
-        restaurants.first(where: { $0.id == id })
+        restaurants.first(where: { $0.id == id }).map(withRecomputedAverageTier)
+    }
+
+    // Return a copy of the restaurant with averageTier recomputed from the
+    // baseline plus every review's tierPlacement. Keeps the mock consistent
+    // with how a real backend would aggregate crowd placements.
+    private func withRecomputedAverageTier(_ restaurant: Restaurant) -> Restaurant {
+        let placements = reviews
+            .filter { $0.restaurantId == restaurant.id }
+            .map { $0.tierPlacement }
+        var copy = restaurant
+        copy.averageTier = TierFlaggingService.recomputeAverageTier(
+            baseline: restaurant.baselineTier,
+            placements: placements
+        )
+        return copy
     }
 
     func fetchReviews(for restaurantId: UUID) -> [Review] {

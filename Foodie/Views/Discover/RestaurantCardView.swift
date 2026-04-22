@@ -49,8 +49,12 @@ struct RestaurantCardView: View {
                     .foregroundStyle(AppTheme.textSecondary)
             }
 
-            // Rating
-            NumericRatingView(rating: restaurant.averageRating, starSize: 11)
+            // Rating + tier badge together
+            HStack(spacing: AppTheme.spacingSM) {
+                NumericRatingView(rating: restaurant.averageRating, starSize: 11)
+                Spacer()
+                TierBadgeView(tier: restaurant.averageTier, style: .subtle)
+            }
         }
         .padding(AppTheme.spacingMD)
         .cardStyle()
@@ -62,7 +66,9 @@ struct RestaurantCardView: View {
         id: UUID(), name: "Sakura Sushi", cuisineType: "Japanese",
         address: "123 Cherry Blossom Ln", latitude: 0, longitude: 0,
         averageRating: 4.5, priceLevel: 3, imageName: "fork.knife.circle.fill",
-        hoursDescription: "11 AM – 10 PM", tags: ["date night"], isOpenNow: true
+        hoursDescription: "11 AM – 10 PM", tags: ["date night"], isOpenNow: true,
+        baselineTier: RestaurantTier(0.72),
+        averageTier: RestaurantTier(0.72)
     ))
     .frame(width: 180)
     .padding()

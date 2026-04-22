@@ -15,6 +15,12 @@ struct Restaurant: Identifiable, Hashable {
     var tags: [String]
     var isOpenNow: Bool
 
+    // Preset tier baseline — acts as the seed before any user placements exist
+    var baselineTier: RestaurantTier
+    // Crowd-adjusted tier — derived from baseline + all user placements.
+    // Stored (rather than computed) so rows/cards don't have to re-aggregate.
+    var averageTier: RestaurantTier
+
     // Formatted price string (e.g. "$$$")
     var priceLevelString: String {
         String(repeating: "$", count: priceLevel)

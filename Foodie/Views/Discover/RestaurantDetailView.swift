@@ -24,7 +24,7 @@ struct RestaurantDetailView: View {
             reviews = dataService.fetchReviews(for: restaurant.id)
         }
         .sheet(isPresented: $showWriteReview) {
-            WriteReviewSheet(restaurantName: restaurant.name)
+            WriteReviewSheet(restaurant: restaurant)
         }
     }
 
@@ -75,6 +75,14 @@ struct RestaurantDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.textSecondary)
                 }
+            }
+
+            // Tier badge row — contextualizes what the rating means
+            HStack(spacing: AppTheme.spacingSM) {
+                TierBadgeView(tier: restaurant.averageTier)
+                Text(restaurant.averageTier.descriptiveLabel)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
 
             Divider()
@@ -182,6 +190,8 @@ private struct ReviewCard: View {
                         .fontWeight(.medium)
                 }
                 Spacer()
+                // Tier badge + stars together show the rating in context
+                TierBadgeView(tier: review.tierPlacement, style: .subtle)
                 StarRatingView(rating: review.clampedRating, starSize: 11)
             }
 
@@ -206,10 +216,22 @@ private struct ReviewCard: View {
 // MARK: - Write Review Sheet (placeholder form)
 
 private struct WriteReviewSheet: View {
-    let restaurantName: String
+    let restaurant: Restaurant
     @Environment(\.dismiss) private var dismiss
     @State private var rating: Int = 3
     @State private var reviewText: String = ""
+    // Initialize the tier placement at the restaurant's current crowd average
+    // so the user starts near the consensus and nudges away if they disagree.
+    @State private var tier: RestaurantTier
+    @State private var showFlagConfirmation = false
+    @State private var pendingFlagMessage: String = ""
+
+    private let dataService: DataServiceProtocol = MockDataService()
+
+    init(restaurant: Restaurant) {
+        self.restaurant = restaurant
+        _tier = State(initialValue: restaurant.averageTier)
+    }
 
     var body: some View {
         NavigationStack {
@@ -226,23 +248,66 @@ private struct WriteReviewSheet: View {
                     Stepper("Stars: \(rating)", value: $rating, in: 1...5)
                 }
 
+                Section {
+                    TierSliderView(
+                        tier: $tier,
+                        averageTier: restaurant.averageTier
+                    )
+                    .padding(.vertical, AppTheme.spacingXS)
+                } header: {
+                    Text("Tier Placement")
+                } footer: {
+                    // Help users understand what the slider is for
+                    Text("Where does this restaurant sit on the spectrum? A " +
+                         "5-star fast-food spot and a 5-star fine-dining spot " +
+                         "aren't the same thing.")
+                }
+
                 Section("Your Review") {
                     TextEditor(text: $reviewText)
                         .frame(minHeight: 100)
                 }
             }
-            .navigationTitle("Review \(restaurantName)")
+            .navigationTitle("Review \(restaurant.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { dismiss() }
+                    Button("Post") { attemptPost() }
                         .fontWeight(.semibold)
                         .disabled(reviewText.isEmpty)
                 }
             }
+            .alert(
+                "Does this look right?",
+                isPresented: $showFlagConfirmation,
+                actions: {
+                    // User confirms — post anyway with their original placement
+                    Button("Yes, post it", role: .destructive) { dismiss() }
+                    // User backs out to adjust the slider
+                    Button("Let me adjust", role: .cancel) { }
+                },
+                message: { Text(pendingFlagMessage) }
+            )
+        }
+    }
+
+    // Evaluate the placement and either show the confirmation alert or post
+    private func attemptPost() {
+        let reviewCount = dataService.fetchReviews(for: restaurant.id).count
+        let result = TierFlaggingService.evaluate(
+            placement: tier,
+            averageTier: restaurant.averageTier,
+            restaurantName: restaurant.name,
+            existingReviewCount: reviewCount
+        )
+        if result.shouldFlag {
+            pendingFlagMessage = result.suggestedMessage
+            showFlagConfirmation = true
+        } else {
+            dismiss()
         }
     }
 }
@@ -254,7 +319,9 @@ private struct WriteReviewSheet: View {
             address: "123 Cherry Blossom Ln", latitude: 0, longitude: 0,
             averageRating: 4.5, priceLevel: 3, imageName: "fork.knife.circle.fill",
             hoursDescription: "11 AM – 10 PM", tags: ["date night", "fresh fish", "sake bar"],
-            isOpenNow: true
+            isOpenNow: true,
+            baselineTier: RestaurantTier(0.72),
+            averageTier: RestaurantTier(0.72)
         ))
     }
 }

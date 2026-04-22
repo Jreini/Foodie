@@ -35,7 +35,11 @@ struct RestaurantRowView: View {
 
             Spacer()
 
-            NumericRatingView(rating: restaurant.averageRating)
+            VStack(alignment: .trailing, spacing: 4) {
+                NumericRatingView(rating: restaurant.averageRating)
+                // Tier badge contextualizes the numeric rating
+                TierBadgeView(tier: restaurant.averageTier, style: .subtle)
+            }
         }
         .padding(.vertical, AppTheme.spacingXS)
     }
@@ -46,7 +50,9 @@ struct RestaurantRowView: View {
         id: UUID(), name: "Sakura Sushi", cuisineType: "Japanese",
         address: "123 Cherry Blossom Ln", latitude: 0, longitude: 0,
         averageRating: 4.5, priceLevel: 3, imageName: "fork.knife.circle.fill",
-        hoursDescription: "11 AM – 10 PM", tags: ["date night"], isOpenNow: true
+        hoursDescription: "11 AM – 10 PM", tags: ["date night"], isOpenNow: true,
+        baselineTier: RestaurantTier(0.72),
+        averageTier: RestaurantTier(0.72)
     ))
     .padding()
 }
