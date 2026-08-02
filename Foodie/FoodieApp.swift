@@ -7,24 +7,23 @@
 
 import SwiftUI
 import CoreData
+import GoogleSignIn
 
 @main
 struct FoodieApp: App {
     let persistenceController = PersistenceController.shared
 
+    // Owns the session for the app's lifetime; RootView switches on its state.
+    @State private var auth = AuthManager()
+
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            RootView()
+                .environment(auth)
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                .task { await printSupabaseSetupCheck() }
+                // Google's OAuth flow returns through the app's custom URL
+                // scheme. Without this hand-off the sign-in never completes.
+                .onOpenURL { GIDSignIn.sharedInstance.handle($0) }
         }
-    }
-
-    // Phase 0 wiring check — prints Supabase connectivity to the Xcode console
-    // on launch. Remove once Phase 1 auth replaces it.
-    private func printSupabaseSetupCheck() async {
-        #if DEBUG
-        print("[Foodie] Supabase: \(await SupabaseService.healthCheck())")
-        #endif
     }
 }

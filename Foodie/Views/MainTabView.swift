@@ -45,4 +45,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
+        .environment(AuthManager())
 }
