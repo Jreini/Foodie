@@ -6,13 +6,37 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B7394FF7301FD6DE0004A14F /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B7394FF6301FD6DE0004A14F /* Auth */; };
+		B7394FF9301FD6DE0004A14F /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = B7394FF8301FD6DE0004A14F /* Functions */; };
+		B7394FFB301FD6DE0004A14F /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B7394FFA301FD6DE0004A14F /* PostgREST */; };
+		B7394FFD301FD6DE0004A14F /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = B7394FFC301FD6DE0004A14F /* Realtime */; };
+		B7394FFF301FD6DE0004A14F /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = B7394FFE301FD6DE0004A14F /* Storage */; };
+		B7395001301FD6DE0004A14F /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B7395000301FD6DE0004A14F /* Supabase */; };
+		B7395004301FD7370004A14F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B7395003301FD7370004A14F /* GoogleSignIn */; };
+		B7395006301FD7370004A14F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B7395005301FD7370004A14F /* GoogleSignInSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		B7CD46F42F88AEA90081BAC0 /* Foodie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Foodie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B7395009301FDBD10004A14F /* Exceptions for "Foodie" folder in "Foodie" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B7CD46F32F88AEA90081BAC0 /* Foodie */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B7CD46F62F88AEA90081BAC0 /* Foodie */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B7395009301FDBD10004A14F /* Exceptions for "Foodie" folder in "Foodie" target */,
+			);
 			path = Foodie;
 			sourceTree = "<group>";
 		};
@@ -23,6 +47,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B7394FFB301FD6DE0004A14F /* PostgREST in Frameworks */,
+				B7394FF9301FD6DE0004A14F /* Functions in Frameworks */,
+				B7395001301FD6DE0004A14F /* Supabase in Frameworks */,
+				B7395006301FD7370004A14F /* GoogleSignInSwift in Frameworks */,
+				B7394FF7301FD6DE0004A14F /* Auth in Frameworks */,
+				B7394FFF301FD6DE0004A14F /* Storage in Frameworks */,
+				B7394FFD301FD6DE0004A14F /* Realtime in Frameworks */,
+				B7395004301FD7370004A14F /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +97,14 @@
 			);
 			name = Foodie;
 			packageProductDependencies = (
+				B7394FF6301FD6DE0004A14F /* Auth */,
+				B7394FF8301FD6DE0004A14F /* Functions */,
+				B7394FFA301FD6DE0004A14F /* PostgREST */,
+				B7394FFC301FD6DE0004A14F /* Realtime */,
+				B7394FFE301FD6DE0004A14F /* Storage */,
+				B7395000301FD6DE0004A14F /* Supabase */,
+				B7395003301FD7370004A14F /* GoogleSignIn */,
+				B7395005301FD7370004A14F /* GoogleSignInSwift */,
 			);
 			productName = Foodie;
 			productReference = B7CD46F42F88AEA90081BAC0 /* Foodie.app */;
@@ -94,6 +134,10 @@
 			);
 			mainGroup = B7CD46EB2F88AEA90081BAC0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				B7395002301FD7370004A14F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B7CD46F52F88AEA90081BAC0 /* Products */;
 			projectDirPath = "";
@@ -249,11 +293,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Foodie/Foodie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8943T9GWZR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Foodie/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Foodies;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -282,11 +328,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Foodie/Foodie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8943T9GWZR;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Foodie/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Foodies;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -332,6 +380,68 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.3;
+			};
+		};
+		B7395002301FD7370004A14F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B7394FF6301FD6DE0004A14F /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		B7394FF8301FD6DE0004A14F /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		B7394FFA301FD6DE0004A14F /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		B7394FFC301FD6DE0004A14F /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		B7394FFE301FD6DE0004A14F /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		B7395000301FD6DE0004A14F /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7394FF5301FD6DE0004A14F /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		B7395003301FD7370004A14F /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7395002301FD7370004A14F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		B7395005301FD7370004A14F /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B7395002301FD7370004A14F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B7CD46EC2F88AEA90081BAC0 /* Project object */;
 }

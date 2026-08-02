@@ -6,6 +6,8 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 
 - UI shell is built and on TestFlight (first build shipped).
 - **All data is mock.** There is no backend, no networking, and no login. Every view model reads from `MockDataService`.
+- **Backend build-out is underway. Phase 0 is complete:** the Supabase project exists, both SPM packages are resolved, Sign in with Apple and Google providers are configured, and connectivity is verified. See `docs/PHASE0_SETUP.md` for what was done and `Foodie/Services/SupabaseService.swift` for the shared client. The launch-time health check in `FoodieApp.swift` is temporary and gets removed in Phase 1.
+- **Next up: Phase 1** — `AuthManager`, login UI, and gating `MainTabView` behind a session. See `docs/FULLSTACK_PLAN.md`.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -14,7 +16,9 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 
 | | |
 |---|---|
-| Xcode project | `Foodie.xcodeproj` (no workspace, no SPM dependencies yet, no CocoaPods) |
+| Xcode project | `Foodie.xcodeproj` (no workspace, no CocoaPods) |
+| Dependencies | `supabase-swift`, `GoogleSignIn-iOS` (SPM, added in Phase 0) |
+| File groups | Synchronized (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files under `Foodie/` join the target automatically, no pbxproj edit needed |
 | Bundle ID | `jrtate.Foodie` |
 | Team ID | `8943T9GWZR` |
 | Deployment target | iOS 26.0 |
