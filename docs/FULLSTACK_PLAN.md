@@ -95,6 +95,10 @@ Server-side logic (all in Postgres, no separate server to run or pay for):
 
 Keep every migration as SQL files in `supabase/migrations/` in this repo (use the Supabase CLI) so the schema is versioned with the code.
 
+> **Phase 2 shipped** as three migrations (schema → functions/triggers → RLS) plus the deferred Phase 1 items: `Profile`, `ProfileService`, `UsernameSetupView`, and `ProfileView`/`EditProfileView` on real data. `AuthManager.state` gained `.needsUsername`, `.ready(user, profile)`, and `.profileUnavailable`. See `docs/PHASE2_SETUP.md` to apply.
+>
+> Two deviations from the sketch above worth noting: `reviews.text` is `body` in SQL (`text` reads badly next to the type name), and the migration backfills profiles for accounts created during Phase 1 testing, since the signup trigger only fires for new users.
+
 ## Phase 3 — Swap the data layer (3–5 days)
 
 1. Make `DataServiceProtocol` `async throws` (it's currently synchronous). Update the five view models to `await` — mechanical but touches everything, do it as its own PR while the mock is still the only implementation.

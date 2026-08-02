@@ -55,8 +55,8 @@ struct ProfileView: View {
                 Button("Cancel", role: .cancel) {}
             }
             .sheet(isPresented: $showEditProfile) {
-                if let user = viewModel.currentUser {
-                    EditProfileView(user: user)
+                if let profile = auth.profile {
+                    EditProfileView(profile: profile)
                 }
             }
             .navigationDestination(for: Restaurant.self) { restaurant in
@@ -66,10 +66,10 @@ struct ProfileView: View {
         }
     }
 
-    // Name from the auth provider, falling back to the email it signed in with.
+    // Name shown in the account menu, falling back to the sign-in email.
     private var accountLabel: String {
-        guard case .signedIn(let user) = auth.state else { return "Account" }
-        return user.fullName ?? user.email ?? "Account"
+        guard case .ready(let user, let profile) = auth.state else { return "Account" }
+        return profile.username.map { "@\($0)" } ?? user.email ?? "Account"
     }
 
     // MARK: - Subviews
@@ -82,19 +82,20 @@ struct ProfileView: View {
                 size: 80
             )
 
-            // Name and username
+            // Name and username come from the real profile row. The stats below
+            // are still mock — they move to Supabase in Phase 3.
             VStack(spacing: AppTheme.spacingXS) {
-                Text(viewModel.currentUser?.name ?? "")
+                Text(auth.profile?.displayName ?? "")
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text("@\(viewModel.currentUser?.username ?? "")")
+                Text(auth.profile?.usernameHandle ?? "")
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.textSecondary)
             }
 
             // Bio
-            if let bio = viewModel.currentUser?.bio, !bio.isEmpty {
+            if let bio = auth.profile?.bio, !bio.isEmpty {
                 Text(bio)
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.textSecondary)
