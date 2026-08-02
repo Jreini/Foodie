@@ -30,45 +30,4 @@ enum SupabaseService {
         supabaseKey: publishableKey
     )
 
-    // MARK: - Setup Verification
-    //
-    // Everything below exists to confirm Phase 0 wiring is correct and is
-    // deleted once real auth lands in Phase 1.
-
-    // False while the placeholders above are still in place.
-    static var isConfigured: Bool {
-        !projectURL.absoluteString.contains("YOUR_PROJECT_REF")
-            && !publishableKey.contains("YOUR_KEY_HERE")
-    }
-
-    // Pings the Auth health endpoint to prove the URL and key are valid.
-    // Returns a human-readable line intended for the Xcode console.
-    static func healthCheck() async -> String {
-        guard isConfigured else {
-            return "Not configured — fill in projectURL and publishableKey in SupabaseService.swift"
-        }
-
-        var request = URLRequest(url: projectURL.appending(path: "auth/v1/health"))
-        request.setValue(publishableKey, forHTTPHeaderField: "apikey")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                return "Unexpected response type from \(projectURL.host() ?? "Supabase")"
-            }
-            let body = String(data: data, encoding: .utf8) ?? ""
-
-            switch http.statusCode {
-            case 200:
-                return "Connected to \(projectURL.host() ?? "Supabase") — \(body)"
-            case 401:
-                return "Reached the project but the key was rejected (401). Check publishableKey."
-            default:
-                return "Unexpected status \(http.statusCode) — \(body)"
-            }
-        } catch {
-            // Most often a wrong project ref (DNS failure) or no network.
-            return "Could not reach \(projectURL.absoluteString) — \(error.localizedDescription)"
-        }
-    }
 }

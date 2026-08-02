@@ -36,8 +36,10 @@ Client work:
 
 1. `AuthManager` (`@Observable`): holds session state (`signedOut / loading / signedIn(User)`), listens to `supabase.auth.authStateChanges`, exposes `signOut()` and account deletion (App Store requires account deletion if you have accounts).
 2. `FoodieApp` shows `LoginView` when signed out, `MainTabView` when signed in. Supabase SDK persists the session in the keychain and auto-refreshes tokens — login survives app restarts for free.
-3. Onboarding step after first sign-in: pick a unique `username` (Apple/Google only give you name + email; usernames like `justineats` are yours).
-4. Wire `ProfileView` to the real profile (name, username, bio, join date).
+3. ~~Onboarding step after first sign-in: pick a unique `username`~~ — **moved to the top of Phase 2.** It needs the `profiles` table to check uniqueness against, so it can't precede the schema.
+4. ~~Wire `ProfileView` to the real profile~~ — **moved to Phase 2** for the same reason. Profile shows a sign-out menu with the real account name in the meantime.
+
+> **Phase 1 shipped** as: `AuthManager` + `RootView` gating + `LoginView` with both native flows + sign-out. Apple's one-shot full name is captured into user metadata at sign-in so Phase 2 can seed the profile from it.
 
 ## Phase 2 — Database schema + RLS (2–3 days, mostly SQL)
 
@@ -81,6 +83,8 @@ activities     (id uuid PK, user_id uuid, restaurant_id uuid,
                 type text check in ('review','like','tasting_add','check_in'),
                 review_id uuid null, created_at)
 ```
+
+Phase 2 now also picks up the two items deferred from Phase 1, and they should come first once `profiles` exists: the username-picker onboarding screen (seeded from the `full_name` already in user metadata) and pointing `ProfileView` at the real profile row.
 
 Server-side logic (all in Postgres, no separate server to run or pay for):
 

@@ -5,9 +5,11 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 ## Current state (August 2026)
 
 - UI shell is built and on TestFlight (first build shipped).
-- **All data is mock.** There is no backend, no networking, and no login. Every view model reads from `MockDataService`.
-- **Backend build-out is underway. Phase 0 is complete:** the Supabase project exists, both SPM packages are resolved, Sign in with Apple and Google providers are configured, and connectivity is verified. See `docs/PHASE0_SETUP.md` for what was done and `Foodie/Services/SupabaseService.swift` for the shared client. The launch-time health check in `FoodieApp.swift` is temporary and gets removed in Phase 1.
-- **Next up: Phase 1** — `AuthManager`, login UI, and gating `MainTabView` behind a session. See `docs/FULLSTACK_PLAN.md`.
+- **Auth is real; all app data is still mock.** You now sign in with a genuine Apple or Google account and the session persists, but every view model still reads from `MockDataService`. Signing in as two different people shows the same fake restaurants and friends.
+- **Phase 0 complete:** Supabase project, SPM packages, and both auth providers configured. See `docs/PHASE0_SETUP.md`.
+- **Phase 1 complete:** `AuthManager` owns the session, `RootView` gates the app behind it, `LoginView` runs both native sign-in flows, and Profile has a sign-out menu.
+- **Deferred from Phase 1 to Phase 2:** username onboarding and wiring `ProfileView` to a real profile. Both need the `profiles` table, so they belong with the schema work rather than ahead of it.
+- **Next up: Phase 2** — Postgres schema, RLS policies, and triggers. See `docs/FULLSTACK_PLAN.md`.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -30,6 +32,19 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 **Do not run builds yourself.** Justin builds and verifies every change in Xcode himself. Make the code change, say what needs verifying, and stop — don't run `xcodebuild`, don't launch the simulator, don't ask to build. He'll report back if something fails.
 
 ## Architecture
+
+### Auth
+
+`Foodie/Services/AuthManager.swift` is the single source of truth for the session. It is `@MainActor @Observable`, injected into the environment from `FoodieApp`, and read with `@Environment(AuthManager.self)`.
+
+- It exposes one `state` (`.loading` / `.signedOut` / `.signedIn(AuthenticatedUser)`) that `RootView` switches on. `.loading` exists so the login screen never flashes while the SDK restores a keychain session.
+- `AuthenticatedUser` is our own struct, not the SDK's `User`. That keeps Supabase types out of the views and avoids colliding with the app's own `User` model.
+- Both sign-ins are **native** token flows (no web view): Apple via `SignInWithAppleButton` → `signInWithIdToken`, Google via `GIDSignIn` → `signInWithIdToken`.
+- **Apple returns the user's name only on the very first authorization**, so `AuthManager` writes it to Supabase user metadata immediately. Losing it means the user must revoke the app under Settings > Apple Account to get it back. Google returns it every time.
+- Google's redirect comes back through the app's URL scheme, so `FoodieApp` must keep `.onOpenURL { GIDSignIn.sharedInstance.handle($0) }`. Sign-in silently never completes without it.
+- Session persistence and token refresh are the SDK's job — don't hand-roll them.
+
+### Data
 
 MVVM with a protocol-seam data layer, designed so the mock backend can be swapped for a real one:
 

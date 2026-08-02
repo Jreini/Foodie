@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @Environment(AuthManager.self) private var auth
     @State private var viewModel = ProfileViewModel()
     @State private var showEditProfile = false
+    @State private var showSignOutConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -17,6 +19,23 @@ struct ProfileView: View {
             .background(AppTheme.screenBackground)
             .navigationTitle("Profile")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        // The header names the signed-in account. Until the
+                        // profiles table lands in Phase 2 the rest of this
+                        // screen is still mock data, so this is the only place
+                        // that reflects who is actually logged in.
+                        Section(accountLabel) {
+                            Button(role: .destructive) {
+                                showSignOutConfirmation = true
+                            } label: {
+                                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showEditProfile = true
@@ -24,6 +43,16 @@ struct ProfileView: View {
                         Text("Edit")
                     }
                 }
+            }
+            .confirmationDialog(
+                "Sign out of Foodie?",
+                isPresented: $showSignOutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Sign Out", role: .destructive) {
+                    Task { await auth.signOut() }
+                }
+                Button("Cancel", role: .cancel) {}
             }
             .sheet(isPresented: $showEditProfile) {
                 if let user = viewModel.currentUser {
@@ -35,6 +64,12 @@ struct ProfileView: View {
             }
             .onAppear { viewModel.loadProfile() }
         }
+    }
+
+    // Name from the auth provider, falling back to the email it signed in with.
+    private var accountLabel: String {
+        guard case .signedIn(let user) = auth.state else { return "Account" }
+        return user.fullName ?? user.email ?? "Account"
     }
 
     // MARK: - Subviews
@@ -203,4 +238,5 @@ struct ProfileView: View {
 
 #Preview {
     ProfileView()
+        .environment(AuthManager())
 }
