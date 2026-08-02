@@ -1,27 +1,27 @@
 import SwiftUI
 
+// Edits the real `profiles` row. Name and bio are writable; the username is
+// shown but fixed, since changing a handle friends already know is a separate
+// feature with its own uniqueness and re-linking concerns.
 struct EditProfileView: View {
-    let user: User
+    let profile: Profile
+
+    @Environment(AuthManager.self) private var auth
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var username: String = ""
     @State private var bio: String = ""
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    // Profile image (non-editable placeholder for now)
+                    // Avatar upload lands with photo support in Phase 7.
                     HStack {
                         Spacer()
-                        VStack(spacing: AppTheme.spacingSM) {
-                            ProfileImageView(systemName: user.profileImageName, size: 80)
-
-                            Text("Change Photo")
-                                .font(.subheadline)
-                                .foregroundStyle(AppTheme.primaryColor)
-                        }
+                        ProfileImageView(systemName: "person.circle.fill", size: 80)
                         Spacer()
                     }
                     .listRowBackground(Color.clear)
@@ -31,15 +31,29 @@ struct EditProfileView: View {
                     TextField("Display name", text: $name)
                 }
 
-                Section("Username") {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                Section {
+                    HStack {
+                        Text("@\(profile.username ?? "")")
+                            .foregroundStyle(AppTheme.textSecondary)
+                        Spacer()
+                    }
+                } header: {
+                    Text("Username")
+                } footer: {
+                    Text("Your username can't be changed right now.")
                 }
 
                 Section("Bio") {
                     TextEditor(text: $bio)
                         .frame(minHeight: 80)
+                }
+
+                if let saveError {
+                    Section {
+                        Text(saveError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
             .navigationTitle("Edit Profile")
@@ -47,29 +61,54 @@ struct EditProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        // Will persist once database is connected
-                        dismiss()
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            Task { await save() }
+                        }
+                        .fontWeight(.semibold)
                     }
-                    .fontWeight(.semibold)
                 }
             }
             .onAppear {
-                name = user.name
-                username = user.username
-                bio = user.bio
+                name = profile.name ?? ""
+                bio = profile.bio
             }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+
+        do {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            try await auth.updateProfile(
+                name: trimmedName.isEmpty ? nil : trimmedName,
+                bio: bio.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            dismiss()
+        } catch {
+            saveError = "Couldn't save your profile. Please try again."
         }
     }
 }
 
 #Preview {
-    EditProfileView(user: User(
-        id: UUID(), name: "Justin Reini", username: "justineats",
-        profileImageName: "person.circle.fill",
-        bio: "Always hunting for the best tacos.",
-        joinDate: Date(), friendIds: []
-    ))
+    EditProfileView(
+        profile: Profile(
+            id: UUID(),
+            username: "justineats",
+            name: "Justin Reini",
+            bio: "Always hunting for the best tacos.",
+            avatarURL: nil,
+            createdAt: Date()
+        )
+    )
+    .environment(AuthManager())
 }

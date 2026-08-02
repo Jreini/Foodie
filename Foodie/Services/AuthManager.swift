@@ -21,7 +21,15 @@ final class AuthManager {
     enum State: Equatable {
         case loading
         case signedOut
-        case signedIn(AuthenticatedUser)
+        // Authenticated, but the account hasn't claimed a username yet.
+        case needsUsername(AuthenticatedUser)
+        // Authenticated with a complete profile — the only state the app proper
+        // is reachable from.
+        case ready(AuthenticatedUser, Profile)
+        // Authenticated, but the profile row couldn't be read (offline, or the
+        // schema migration hasn't been applied). Recoverable, so this doesn't
+        // dump the user back to the login screen.
+        case profileUnavailable(AuthenticatedUser)
     }
 
     // The slice of the Supabase user this app actually needs. Owning the type
@@ -64,16 +72,88 @@ final class AuthManager {
     private func apply(event: AuthChangeEvent, session: Session?) {
         switch event {
         case .initialSession, .signedIn, .tokenRefreshed, .userUpdated:
-            if let session {
-                state = .signedIn(Self.authenticatedUser(from: session))
-            } else {
+            guard let session else {
                 state = .signedOut
+                return
             }
+
+            let user = Self.authenticatedUser(from: session)
+            // Token refreshes fire on a timer. Re-fetching the profile each
+            // time would flicker the UI for no benefit.
+            guard !isResolved(for: user) else { return }
+
+            state = .loading
+            Task { await loadProfile(for: user) }
+
         case .signedOut:
             state = .signedOut
+
         default:
             break
         }
+    }
+
+    private func isResolved(for user: AuthenticatedUser) -> Bool {
+        switch state {
+        case .ready(let current, _):      return current.id == user.id
+        case .needsUsername(let current): return current.id == user.id
+        default:                          return false
+        }
+    }
+
+    // MARK: - Profile
+
+    // Convenience for views that only care about the profile itself.
+    var profile: Profile? {
+        if case .ready(_, let profile) = state { return profile }
+        return nil
+    }
+
+    private func loadProfile(for user: AuthenticatedUser) async {
+        do {
+            let profile = try await ProfileService.fetchProfile(id: user.id)
+
+            // A row with no username means the account exists but onboarding
+            // never finished. A missing row means the signup trigger hasn't run
+            // — either way the next step is picking a username.
+            if let profile, profile.username != nil {
+                state = .ready(user, profile)
+            } else {
+                state = .needsUsername(user)
+            }
+        } catch {
+            state = .profileUnavailable(user)
+        }
+    }
+
+    // Claims a username and completes onboarding. Throws so the setup screen
+    // can distinguish "taken" from a general failure.
+    func claimUsername(_ username: String) async throws {
+        guard case .needsUsername(let user) = state else { return }
+
+        do {
+            let profile = try await ProfileService.claimUsername(
+                username,
+                userId: user.id,
+                name: user.fullName
+            )
+            state = .ready(user, profile)
+        } catch where ProfileService.isUniqueViolation(error) {
+            // Someone claimed it between the availability check and the write.
+            throw UsernameTakenError()
+        }
+    }
+
+    func updateProfile(name: String?, bio: String) async throws {
+        guard case .ready(let user, _) = state else { return }
+        let profile = try await ProfileService.updateProfile(id: user.id, name: name, bio: bio)
+        state = .ready(user, profile)
+    }
+
+    func retryProfileLoad() async {
+        guard case .profileUnavailable(let user) = state else { return }
+        state = .loading
+        await loadProfile(for: user)
     }
 
     private static func authenticatedUser(from session: Session) -> AuthenticatedUser {
