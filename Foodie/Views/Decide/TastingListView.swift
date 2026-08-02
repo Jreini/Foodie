@@ -35,7 +35,8 @@ struct TastingListView: View {
                 }
             }
         }
-        .onAppear { viewModel.loadTastingList() }
+        .refreshable { await viewModel.loadTastingList() }
+        .task { await viewModel.loadTastingList() }
         .alert("Random Pick!", isPresented: $showRandomPick) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -71,7 +72,7 @@ struct TastingListView: View {
                 }
             }
             .onDelete { offsets in
-                viewModel.removeEntry(at: offsets)
+                Task { await viewModel.removeEntry(at: offsets) }
             }
         }
         .listStyle(.insetGrouped)
@@ -151,7 +152,7 @@ private struct AddToTastingListSheet: View {
                 if let restaurant = selectedRestaurant {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Add") {
-                            viewModel.addRestaurant(restaurant, notes: notes)
+                            Task { await viewModel.addRestaurant(restaurant, notes: notes) }
                             dismiss()
                         }
                         .fontWeight(.semibold)

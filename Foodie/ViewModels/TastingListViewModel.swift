@@ -3,34 +3,61 @@ import SwiftUI
 import Observation
 
 @Observable
+@MainActor
 class TastingListViewModel {
     var entries: [TastingListEntry] = []
     var restaurants: [UUID: Restaurant] = [:]
     var randomPick: Restaurant? = nil
 
-    private let dataService: DataServiceProtocol
+    var isLoading = false
+    var errorMessage: String?
+
+    private let dataService: any DataServiceProtocol
     private var currentUserId: UUID?
 
-    init(dataService: DataServiceProtocol = MockDataService()) {
+    init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
     }
 
-    func loadTastingList() {
-        let currentUser = dataService.fetchCurrentUser()
-        currentUserId = currentUser.id
-        entries = dataService.fetchTastingList(for: currentUser.id)
+    func loadTastingList() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
-        // Map restaurant IDs to Restaurant objects for easy lookup
-        let allRestaurants = dataService.fetchAllRestaurants()
-        restaurants = Dictionary(uniqueKeysWithValues: allRestaurants.map { ($0.id, $0) })
+        do {
+            let currentUser = try await dataService.fetchCurrentUser()
+            currentUserId = currentUser.id
+
+            async let entriesTask = dataService.fetchTastingList(for: currentUser.id)
+            async let restaurantsTask = dataService.fetchAllRestaurants()
+
+            entries = try await entriesTask
+            restaurants = Dictionary(
+                uniqueKeysWithValues: try await restaurantsTask.map { ($0.id, $0) }
+            )
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 
     func restaurantForEntry(_ entry: TastingListEntry) -> Restaurant? {
         restaurants[entry.restaurantId]
     }
 
-    func removeEntry(at offsets: IndexSet) {
+    // Removes locally first so the row disappears under the finger, then syncs.
+    // A failed delete puts the entry back rather than lying about the result.
+    func removeEntry(at offsets: IndexSet) async {
+        let removed = offsets.map { entries[$0] }
         entries.remove(atOffsets: offsets)
+
+        do {
+            for entry in removed {
+                try await dataService.removeFromTastingList(restaurantId: entry.restaurantId)
+            }
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+            await loadTastingList()
+        }
     }
 
     func pickRandomEntry() {
@@ -48,18 +75,17 @@ class TastingListViewModel {
             .sorted { $0.name < $1.name }
     }
 
-    // Adds a restaurant to the Tasting List (local-only for mock data)
-    func addRestaurant(_ restaurant: Restaurant, notes: String = "") {
-        guard let userId = currentUserId else { return }
-        // Prevent duplicates
+    func addRestaurant(_ restaurant: Restaurant, notes: String = "") async {
         guard !entries.contains(where: { $0.restaurantId == restaurant.id }) else { return }
-        let entry = TastingListEntry(
-            id: UUID(),
-            userId: userId,
-            restaurantId: restaurant.id,
-            dateAdded: Date(),
-            notes: notes
-        )
-        entries.insert(entry, at: 0)
+
+        do {
+            let entry = try await dataService.addToTastingList(
+                restaurantId: restaurant.id,
+                notes: notes
+            )
+            entries.insert(entry, at: 0)
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 }

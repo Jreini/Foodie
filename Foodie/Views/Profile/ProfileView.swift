@@ -62,7 +62,8 @@ struct ProfileView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
-            .onAppear { viewModel.loadProfile() }
+            .refreshable { await viewModel.loadProfile() }
+            .task { await viewModel.loadProfile() }
         }
     }
 

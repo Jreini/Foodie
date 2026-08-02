@@ -2,18 +2,36 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class FeedViewModel {
     var activities: [FriendActivity] = []
+    var isLoading = false
+    var errorMessage: String?
 
-    private let dataService: DataServiceProtocol
+    // Distinguishes "no friends yet" from "hasn't loaded yet" — the two want
+    // very different empty states.
+    var hasLoadedOnce = false
 
-    init(dataService: DataServiceProtocol = MockDataService()) {
+    private let dataService: any DataServiceProtocol
+
+    init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
     }
 
-    func loadActivityFeed() {
-        let currentUser = dataService.fetchCurrentUser()
-        activities = dataService.fetchActivityFeed(for: currentUser.id)
+    func loadActivityFeed() async {
+        isLoading = true
+        errorMessage = nil
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
+
+        do {
+            let currentUser = try await dataService.fetchCurrentUser()
+            activities = try await dataService.fetchActivityFeed(for: currentUser.id)
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 
     func restaurant(for activity: FriendActivity) -> Restaurant {

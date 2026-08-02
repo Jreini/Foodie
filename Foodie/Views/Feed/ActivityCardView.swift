@@ -83,9 +83,10 @@ struct ActivityCardView: View {
 }
 
 #Preview {
+    // The mock's feed is built lazily, so reach for it directly rather than
+    // through the now-async protocol method.
     let service = MockDataService()
-    let activities = service.fetchActivityFeed(for: MockDataService.currentUserId)
-    if let first = activities.first {
+    if let first = service.activityFeed.first {
         ActivityCardView(activity: first)
             .padding()
     }

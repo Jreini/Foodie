@@ -308,25 +308,29 @@ class MockDataService: DataServiceProtocol {
     }()
 
     // MARK: - Protocol Methods
+    //
+    // Everything is `async throws` to match the live service. None of it
+    // actually suspends or fails — the mock is in-memory — but sharing the
+    // signature is what lets previews stand in for the real thing.
 
-    func fetchCurrentUser() -> User {
+    func fetchCurrentUser() async throws -> User {
         users.first(where: { $0.id == Self.currentUserId })!
     }
 
-    func fetchAllUsers() -> [User] {
+    func fetchAllUsers() async throws -> [User] {
         users
     }
 
-    func fetchFriends(for userId: UUID) -> [User] {
+    func fetchFriends(for userId: UUID) async throws -> [User] {
         guard let user = users.first(where: { $0.id == userId }) else { return [] }
         return users.filter { user.friendIds.contains($0.id) }
     }
 
-    func fetchAllRestaurants() -> [Restaurant] {
+    func fetchAllRestaurants() async throws -> [Restaurant] {
         restaurants.map(withRecomputedAverageTier)
     }
 
-    func fetchRestaurant(by id: UUID) -> Restaurant? {
+    func fetchRestaurant(by id: UUID) async throws -> Restaurant? {
         restaurants.first(where: { $0.id == id }).map(withRecomputedAverageTier)
     }
 
@@ -345,27 +349,93 @@ class MockDataService: DataServiceProtocol {
         return copy
     }
 
-    func fetchReviews(for restaurantId: UUID) -> [Review] {
+    func fetchReviews(for restaurantId: UUID) async throws -> [Review] {
         reviews.filter { $0.restaurantId == restaurantId }
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    func fetchReviews(by userId: UUID) -> [Review] {
+    func fetchReviews(by userId: UUID) async throws -> [Review] {
         reviews.filter { $0.userId == userId }
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    func fetchTastingList(for userId: UUID) -> [TastingListEntry] {
+    func fetchTastingList(for userId: UUID) async throws -> [TastingListEntry] {
         tastingListEntries.filter { $0.userId == userId }
             .sorted { $0.dateAdded > $1.dateAdded }
     }
 
-    func fetchActivityFeed(for userId: UUID) -> [FriendActivity] {
+    func fetchActivityFeed(for userId: UUID) async throws -> [FriendActivity] {
         activityFeed
     }
 
-    func fetchLikedRestaurantIds(for userId: UUID) -> [UUID] {
+    func fetchLikedRestaurantIds(for userId: UUID) async throws -> [UUID] {
         likedRestaurantIds
+    }
+
+    // MARK: - Writes
+    //
+    // Mutates the in-memory sample data so previews behave like the real thing
+    // for the length of a session. Nothing persists across launches.
+
+    @discardableResult
+    func addToTastingList(restaurantId: UUID, notes: String) async throws -> TastingListEntry {
+        if let existing = tastingListEntries.first(where: {
+            $0.userId == Self.currentUserId && $0.restaurantId == restaurantId
+        }) {
+            return existing
+        }
+
+        let entry = TastingListEntry(
+            id: UUID(),
+            userId: Self.currentUserId,
+            restaurantId: restaurantId,
+            dateAdded: Date(),
+            notes: notes
+        )
+        tastingListEntries.insert(entry, at: 0)
+        return entry
+    }
+
+    func removeFromTastingList(restaurantId: UUID) async throws {
+        tastingListEntries.removeAll {
+            $0.userId == Self.currentUserId && $0.restaurantId == restaurantId
+        }
+    }
+
+    func setLiked(_ liked: Bool, restaurantId: UUID) async throws {
+        if liked {
+            guard !likedRestaurantIds.contains(restaurantId) else { return }
+            likedRestaurantIds.append(restaurantId)
+        } else {
+            likedRestaurantIds.removeAll { $0 == restaurantId }
+        }
+    }
+
+    @discardableResult
+    func submitReview(
+        restaurantId: UUID,
+        rating: Int,
+        text: String,
+        moodTags: [String],
+        tierPlacement: RestaurantTier
+    ) async throws -> Review {
+        let review = Review(
+            id: UUID(),
+            userId: Self.currentUserId,
+            restaurantId: restaurantId,
+            rating: rating,
+            text: text,
+            moodTags: moodTags,
+            photoNames: [],
+            createdAt: Date(),
+            tierPlacement: tierPlacement
+        )
+
+        // One review per person per restaurant, matching the database's
+        // unique constraint.
+        reviews.removeAll { $0.userId == Self.currentUserId && $0.restaurantId == restaurantId }
+        reviews.insert(review, at: 0)
+        return review
     }
 
     // MARK: - Date Helpers

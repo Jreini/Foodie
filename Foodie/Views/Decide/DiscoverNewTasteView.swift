@@ -67,7 +67,7 @@ struct DiscoverNewTasteView: View {
         .background(AppTheme.screenBackground)
         .navigationTitle("Discover a New Taste")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { viewModel.loadData() }
+        .task { await viewModel.loadData() }
     }
 
     // MARK: - Subviews

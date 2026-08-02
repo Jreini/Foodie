@@ -2,11 +2,14 @@ import SwiftUI
 
 struct RestaurantDetailView: View {
     let restaurant: Restaurant
-    @State private var reviews: [Review] = []
-    @State private var showWriteReview = false
-    @State private var addedToTastingList = false
 
-    private let dataService: DataServiceProtocol = MockDataService()
+    @State private var reviews: [Review] = []
+    @State private var reviewersById: [UUID: User] = [:]
+    @State private var showWriteReview = false
+    @State private var isOnTastingList = false
+    @State private var errorMessage: String?
+
+    private let dataService: any DataServiceProtocol = DataServices.current
 
     var body: some View {
         ScrollView {
@@ -15,16 +18,70 @@ struct RestaurantDetailView: View {
                 infoSection
                 tagsSection
                 actionButtonsSection
+                errorBanner
                 reviewsSection
             }
         }
         .navigationTitle(restaurant.name)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            reviews = dataService.fetchReviews(for: restaurant.id)
-        }
+        .task { await load() }
         .sheet(isPresented: $showWriteReview) {
-            WriteReviewSheet(restaurant: restaurant)
+            WriteReviewSheet(
+                restaurant: restaurant,
+                existingReviewCount: reviews.count,
+                onPosted: { await load() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var errorBanner: some View {
+        if let errorMessage {
+            Text(errorMessage)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .padding(.horizontal, AppTheme.spacingLG)
+                .padding(.bottom, AppTheme.spacingSM)
+        }
+    }
+
+    private func load() async {
+        do {
+            async let reviewsTask = dataService.fetchReviews(for: restaurant.id)
+            async let usersTask = dataService.fetchAllUsers()
+            async let currentUserTask = dataService.fetchCurrentUser()
+
+            reviews = try await reviewsTask
+            reviewersById = Dictionary(
+                uniqueKeysWithValues: try await usersTask.map { ($0.id, $0) }
+            )
+
+            let currentUser = try await currentUserTask
+            let tastingList = try await dataService.fetchTastingList(for: currentUser.id)
+            isOnTastingList = tastingList.contains { $0.restaurantId == restaurant.id }
+            errorMessage = nil
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
+    }
+
+    // Flips the button immediately and syncs behind it, because waiting on a
+    // round trip to shade a bookmark feels broken. A failure puts it back
+    // rather than leaving the UI claiming something that didn't happen.
+    private func toggleTastingList() async {
+        let wasOnList = isOnTastingList
+        withAnimation { isOnTastingList.toggle() }
+
+        do {
+            if wasOnList {
+                try await dataService.removeFromTastingList(restaurantId: restaurant.id)
+            } else {
+                try await dataService.addToTastingList(restaurantId: restaurant.id, notes: "")
+            }
+            errorMessage = nil
+        } catch {
+            withAnimation { isOnTastingList = wasOnList }
+            errorMessage = DataLoadFailure.message(for: error)
         }
     }
 
@@ -119,18 +176,18 @@ struct RestaurantDetailView: View {
         HStack(spacing: AppTheme.spacingMD) {
             // Add to tasting list button
             Button {
-                withAnimation { addedToTastingList.toggle() }
+                Task { await toggleTastingList() }
             } label: {
                 Label(
-                    addedToTastingList ? "On Tasting List" : "Tasting List",
-                    systemImage: addedToTastingList ? "bookmark.fill" : "bookmark"
+                    isOnTastingList ? "On Tasting List" : "Tasting List",
+                    systemImage: isOnTastingList ? "bookmark.fill" : "bookmark"
                 )
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, AppTheme.spacingMD)
-                .background(addedToTastingList ? AppTheme.primaryColor : AppTheme.tagBackground)
-                .foregroundStyle(addedToTastingList ? .white : AppTheme.textPrimary)
+                .background(isOnTastingList ? AppTheme.primaryColor : AppTheme.tagBackground)
+                .foregroundStyle(isOnTastingList ? .white : AppTheme.textPrimary)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
             }
 
@@ -165,7 +222,7 @@ struct RestaurantDetailView: View {
                     .padding(.horizontal, AppTheme.spacingLG)
             } else {
                 ForEach(reviews) { review in
-                    ReviewCard(review: review)
+                    ReviewCard(review: review, reviewer: reviewersById[review.userId])
                 }
             }
         }
@@ -177,15 +234,17 @@ struct RestaurantDetailView: View {
 
 private struct ReviewCard: View {
     let review: Review
-    private let dataService: DataServiceProtocol = MockDataService()
+    // Resolved by the parent, which already loads people in bulk — a card that
+    // fetched its own author would issue one request per row.
+    let reviewer: User?
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
             HStack {
                 // Reviewer info
-                if let user = dataService.fetchAllUsers().first(where: { $0.id == review.userId }) {
-                    ProfileImageView(systemName: user.profileImageName, size: 28)
-                    Text(user.name)
+                if let reviewer {
+                    ProfileImageView(systemName: reviewer.profileImageName, size: 28)
+                    Text(reviewer.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
@@ -217,19 +276,32 @@ private struct ReviewCard: View {
 
 private struct WriteReviewSheet: View {
     let restaurant: Restaurant
+    // Passed in rather than re-fetched, so the flagging check doesn't need a
+    // network round trip from inside a button handler.
+    let existingReviewCount: Int
+    let onPosted: () async -> Void
+
     @Environment(\.dismiss) private var dismiss
     @State private var rating: Int = 3
     @State private var reviewText: String = ""
+    @State private var isPosting = false
+    @State private var postError: String?
     // Initialize the tier placement at the restaurant's current crowd average
     // so the user starts near the consensus and nudges away if they disagree.
     @State private var tier: RestaurantTier
     @State private var showFlagConfirmation = false
     @State private var pendingFlagMessage: String = ""
 
-    private let dataService: DataServiceProtocol = MockDataService()
+    private let dataService: any DataServiceProtocol = DataServices.current
 
-    init(restaurant: Restaurant) {
+    init(
+        restaurant: Restaurant,
+        existingReviewCount: Int,
+        onPosted: @escaping () async -> Void
+    ) {
         self.restaurant = restaurant
+        self.existingReviewCount = existingReviewCount
+        self.onPosted = onPosted
         _tier = State(initialValue: restaurant.averageTier)
     }
 
@@ -267,17 +339,30 @@ private struct WriteReviewSheet: View {
                     TextEditor(text: $reviewText)
                         .frame(minHeight: 100)
                 }
+
+                if let postError {
+                    Section {
+                        Text(postError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
             }
             .navigationTitle("Review \(restaurant.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isPosting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") { attemptPost() }
-                        .fontWeight(.semibold)
-                        .disabled(reviewText.isEmpty)
+                    if isPosting {
+                        ProgressView()
+                    } else {
+                        Button("Post") { attemptPost() }
+                            .fontWeight(.semibold)
+                            .disabled(reviewText.isEmpty)
+                    }
                 }
             }
             .alert(
@@ -285,7 +370,9 @@ private struct WriteReviewSheet: View {
                 isPresented: $showFlagConfirmation,
                 actions: {
                     // User confirms — post anyway with their original placement
-                    Button("Yes, post it", role: .destructive) { dismiss() }
+                    Button("Yes, post it", role: .destructive) {
+                        Task { await post() }
+                    }
                     // User backs out to adjust the slider
                     Button("Let me adjust", role: .cancel) { }
                 },
@@ -296,18 +383,39 @@ private struct WriteReviewSheet: View {
 
     // Evaluate the placement and either show the confirmation alert or post
     private func attemptPost() {
-        let reviewCount = dataService.fetchReviews(for: restaurant.id).count
         let result = TierFlaggingService.evaluate(
             placement: tier,
             averageTier: restaurant.averageTier,
             restaurantName: restaurant.name,
-            existingReviewCount: reviewCount
+            existingReviewCount: existingReviewCount
         )
         if result.shouldFlag {
             pendingFlagMessage = result.suggestedMessage
             showFlagConfirmation = true
         } else {
+            Task { await post() }
+        }
+    }
+
+    private func post() async {
+        isPosting = true
+        postError = nil
+        defer { isPosting = false }
+
+        do {
+            try await dataService.submitReview(
+                restaurantId: restaurant.id,
+                rating: rating,
+                text: reviewText,
+                // Mood tags don't have an input control yet; the column and the
+                // model field are both ready for when one lands.
+                moodTags: [],
+                tierPlacement: tier
+            )
+            await onPosted()
             dismiss()
+        } catch {
+            postError = DataLoadFailure.message(for: error)
         }
     }
 }

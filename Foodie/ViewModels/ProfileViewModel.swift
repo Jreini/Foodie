@@ -2,12 +2,16 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class ProfileViewModel {
     var currentUser: User?
     var userReviews: [Review] = []
     var likedRestaurants: [Restaurant] = []
     var tastingListRestaurants: [Restaurant] = []
     var allRestaurants: [Restaurant] = []
+
+    var isLoading = false
+    var errorMessage: String?
 
     // Tracks which segment is selected in the profile
     var selectedSegment: ProfileSegment = .reviews
@@ -22,25 +26,39 @@ class ProfileViewModel {
     var friendCount: Int { currentUser?.friendCount ?? 0 }
     var tastingListCount: Int { tastingListRestaurants.count }
 
-    private let dataService: DataServiceProtocol
+    private let dataService: any DataServiceProtocol
 
-    init(dataService: DataServiceProtocol = MockDataService()) {
+    init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
     }
 
-    func loadProfile() {
-        let user = dataService.fetchCurrentUser()
-        currentUser = user
-        allRestaurants = dataService.fetchAllRestaurants()
+    func loadProfile() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
-        userReviews = dataService.fetchReviews(by: user.id)
+        do {
+            let user = try await dataService.fetchCurrentUser()
+            currentUser = user
 
-        let likedIds = dataService.fetchLikedRestaurantIds(for: user.id)
-        likedRestaurants = allRestaurants.filter { likedIds.contains($0.id) }
+            // Independent queries, so run them concurrently rather than in a
+            // chain of four round trips.
+            async let restaurantsTask = dataService.fetchAllRestaurants()
+            async let reviewsTask = dataService.fetchReviews(by: user.id)
+            async let likedTask = dataService.fetchLikedRestaurantIds(for: user.id)
+            async let tastingTask = dataService.fetchTastingList(for: user.id)
 
-        let tastingEntries = dataService.fetchTastingList(for: user.id)
-        let tastingIds = tastingEntries.map { $0.restaurantId }
-        tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
+            allRestaurants = try await restaurantsTask
+            userReviews = try await reviewsTask
+
+            let liked = Set(try await likedTask)
+            likedRestaurants = allRestaurants.filter { liked.contains($0.id) }
+
+            let tastingIds = Set(try await tastingTask.map(\.restaurantId))
+            tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 
     func restaurantForReview(_ review: Review) -> Restaurant? {

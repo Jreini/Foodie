@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class DecisionEngineViewModel {
     var likedRestaurants: [Restaurant] = []
     var tastingListRestaurants: [Restaurant] = []
@@ -11,38 +12,52 @@ class DecisionEngineViewModel {
     var pickedRestaurant: Restaurant? = nil
     var isAnimatingPick: Bool = false
 
-    private let dataService: DataServiceProtocol
+    var isLoading = false
+    var errorMessage: String?
 
-    init(dataService: DataServiceProtocol = MockDataService()) {
+    private let dataService: any DataServiceProtocol
+
+    init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
     }
 
-    func loadData() {
-        let currentUser = dataService.fetchCurrentUser()
-        allRestaurants = dataService.fetchAllRestaurants()
-        friends = dataService.fetchFriends(for: currentUser.id)
+    func loadData() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
-        // Build liked restaurants from liked IDs
-        let likedIds = dataService.fetchLikedRestaurantIds(for: currentUser.id)
-        likedRestaurants = allRestaurants.filter { likedIds.contains($0.id) }
+        do {
+            let currentUser = try await dataService.fetchCurrentUser()
 
-        // Build tasting list restaurants
-        let tastingEntries = dataService.fetchTastingList(for: currentUser.id)
-        let tastingIds = tastingEntries.map { $0.restaurantId }
-        tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
+            async let restaurantsTask = dataService.fetchAllRestaurants()
+            async let friendsTask = dataService.fetchFriends(for: currentUser.id)
+            async let likedTask = dataService.fetchLikedRestaurantIds(for: currentUser.id)
+            async let tastingTask = dataService.fetchTastingList(for: currentUser.id)
+
+            allRestaurants = try await restaurantsTask
+            friends = try await friendsTask
+
+            let likedIds = Set(try await likedTask)
+            likedRestaurants = allRestaurants.filter { likedIds.contains($0.id) }
+
+            let tastingIds = Set(try await tastingTask.map(\.restaurantId))
+            tastingListRestaurants = allRestaurants.filter { tastingIds.contains($0.id) }
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 
     // Picks a random restaurant from liked places + tasting list combined
-    func pickRandomForMe() {
+    func pickRandomForMe() async {
         let pool = Array(Set(likedRestaurants + tastingListRestaurants))
         guard !pool.isEmpty else { return }
         isAnimatingPick = true
 
-        // Simulate brief "spin" delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
-            pickedRestaurant = pool.randomElement()
-            isAnimatingPick = false
-        }
+        // Brief "spin" before the reveal. Structured concurrency rather than
+        // asyncAfter, so the delay stays on the main actor with the state.
+        try? await Task.sleep(for: .milliseconds(600))
+        pickedRestaurant = pool.randomElement()
+        isAnimatingPick = false
     }
 
     // Roll the Dice for a group: mock-picks a random spot the group might overlap on
@@ -56,14 +71,13 @@ class DecisionEngineViewModel {
     }
 
     // Animated version of group pick used by Roll the Dice
-    func rollForGroup(selectedFriendIds: [UUID]) {
+    func rollForGroup(selectedFriendIds: [UUID]) async {
         guard !selectedFriendIds.isEmpty else { return }
         isAnimatingPick = true
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
-            pickedRestaurant = pickForGroup(selectedFriendIds: selectedFriendIds)
-            isAnimatingPick = false
-        }
+        try? await Task.sleep(for: .milliseconds(600))
+        pickedRestaurant = pickForGroup(selectedFriendIds: selectedFriendIds)
+        isAnimatingPick = false
     }
 
     // Suggests a restaurant nobody in the group has visited

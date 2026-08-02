@@ -5,11 +5,13 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 ## Current state (August 2026)
 
 - UI shell is built and on TestFlight (first build shipped).
-- **Accounts are real; app content is still mock.** Sign-in, the `profiles` row, usernames, and profile editing all hit Supabase. Restaurants, reviews, friends, tasting lists, and the feed still come from `MockDataService` — so Profile shows a real name and handle above fictional stats. That's expected until Phase 3.
+- **The app runs on real data.** Accounts, profiles, restaurants, reviews, likes, tasting lists, and the feed all come from Supabase. `MockDataService` survives only for SwiftUI previews.
+- **Friends are the exception** — the `friendships` table and its policies exist, but nothing writes to them until Phase 5, so friend lists and the group picker are empty by design.
 - **Phase 0 complete:** Supabase project, SPM packages, both auth providers. See `docs/PHASE0_SETUP.md`.
 - **Phase 1 complete:** `AuthManager` owns the session, `RootView` gates on it, `LoginView` runs both native sign-in flows.
-- **Phase 2 complete:** full Postgres schema, RLS on every table, triggers, plus the two items moved from Phase 1 (username onboarding and real profile data). See `docs/PHASE2_SETUP.md`.
-- **Next up: Phase 3** — make `DataServiceProtocol` `async throws` and add `SupabaseDataService`. See `docs/FULLSTACK_PLAN.md`.
+- **Phase 2 complete:** full Postgres schema, RLS on every table, triggers, username onboarding, real profile data. See `docs/PHASE2_SETUP.md`.
+- **Phase 3 complete:** `DataServiceProtocol` is `async throws`, `SupabaseDataService` backs it, and every view model has loading/error/empty states. See `docs/PHASE3_SETUP.md`.
+- **Next up: Phase 4** — MapKit restaurant search, replacing the seeded starter rows. See `docs/FULLSTACK_PLAN.md`.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -63,9 +65,11 @@ MVVM with a protocol-seam data layer, designed so the mock backend can be swappe
 Views (SwiftUI)  →  ViewModels (@Observable)  →  DataServiceProtocol  →  MockDataService
 ```
 
-- `Foodie/Services/DataServiceProtocol.swift` — the single contract for all data operations (users, friends, restaurants, reviews, tasting list, activity feed, likes). **This is the seam where a real backend plugs in.** Note: it is currently synchronous; a real backend will require making it `async throws`.
-- `Foodie/Services/MockDataService.swift` — hard-coded users/restaurants/reviews with stable UUIDs so relationships stay consistent. Keep it working even after a real backend exists — it powers previews and offline development.
-- Each view model defaults to `MockDataService()` in its initializer (`init(dataService: DataServiceProtocol = MockDataService())`). There is no dependency-injection container; when a real service arrives, injection should move to the environment or app root.
+- `Foodie/Services/DataServiceProtocol.swift` — the single `async throws` contract for all data operations, plus `DataServices.current`, which resolves to `SupabaseDataService` normally and `MockDataService` inside SwiftUI previews (detected via `XCODE_RUNNING_FOR_PREVIEWS`). View models default to `DataServices.current`, so previews never hit the network — they'd have no session anyway.
+- `Foodie/Services/SupabaseDataService.swift` — the live implementation. Row DTOs are private to that file and deliberately separate from the app models, because the DB shape and the UI shape differ on purpose (`Restaurant.imageName` is a UI placeholder with no column; `Review.text` maps to the `body` column).
+- `Foodie/Services/MockDataService.swift` — hard-coded sample data with stable UUIDs. **Keep it conforming.** Its `async throws` methods never actually suspend or throw; matching the signature is the whole point.
+- **Don't add client-side filters believing they're security.** `fetchActivityFeed` selects the whole table on purpose — RLS narrows it to the caller and their friends server-side.
+- View models are `@MainActor @Observable` with `isLoading` / `errorMessage`. Views load with `.task` (not `.onAppear`) and offer `.refreshable`. Writes are optimistic: flip local state, sync, roll back on failure.
 
 ### Directory map (`Foodie/`)
 
