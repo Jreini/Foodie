@@ -12,6 +12,9 @@ struct SupabaseDataService: DataServiceProtocol {
 
     private var client: SupabaseClient { SupabaseService.client }
 
+    // One screenful plus headroom, so the first page rarely needs a second.
+    static let feedPageSize = 30
+
     private func currentUserId() throws -> UUID {
         guard let id = client.auth.currentUser?.id else {
             throw DataServiceError.notSignedIn
@@ -58,6 +61,82 @@ struct SupabaseDataService: DataServiceProtocol {
             .value
 
         return rows.map { $0.user(friendIds: []) }
+    }
+
+    // MARK: - Friendships
+
+    func searchUsers(username: String) async throws -> [User] {
+        let term = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard term.count >= 2 else { return [] }
+
+        let rows: [ProfileRow] = try await client
+            .from("profiles")
+            .select()
+            .ilike("username", pattern: "%\(term)%")
+            .limit(25)
+            .execute()
+            .value
+
+        return rows.map { $0.user(friendIds: []) }
+    }
+
+    func fetchFriendships() async throws -> [Friendship] {
+        // No filter needed: the friendships SELECT policy already restricts
+        // this to rows the caller is part of.
+        let rows: [FriendshipRow] = try await client
+            .from("friendships")
+            .select()
+            .execute()
+            .value
+
+        return rows.compactMap(\.friendship)
+    }
+
+    func sendFriendRequest(to userId: UUID) async throws {
+        let requesterId = try currentUserId()
+        guard requesterId != userId else { return }
+
+        do {
+            try await client
+                .from("friendships")
+                .insert(FriendshipInsert(requesterId: requesterId, addresseeId: userId))
+                .execute()
+        } catch where Self.isUniqueViolation(error) {
+            // The unique index covers both directions, so this means an edge
+            // already exists — usually they requested you first.
+            throw FriendRequestError.alreadyExists
+        }
+    }
+
+    func acceptFriendRequest(friendshipId: UUID) async throws {
+        // The UPDATE policy allows only the addressee, so this is safe to send
+        // without re-checking who's who on the client.
+        try await client
+            .from("friendships")
+            .update(FriendshipAccept(status: "accepted", respondedAt: Date()))
+            .eq("id", value: friendshipId)
+            .execute()
+    }
+
+    func removeFriendship(friendshipId: UUID) async throws {
+        try await client
+            .from("friendships")
+            .delete()
+            .eq("id", value: friendshipId)
+            .execute()
+    }
+
+    func groupPickCandidates(friendIds: [UUID]) async throws -> [UUID] {
+        let rows: [GroupPickRow] = try await client
+            .rpc("group_pick_candidates", params: GroupPickParams(friendIds: friendIds))
+            .execute()
+            .value
+
+        return rows.map(\.restaurantId)
+    }
+
+    private static func isUniqueViolation(_ error: Error) -> Bool {
+        (error as? PostgrestError)?.code == "23505"
     }
 
     // RLS only exposes friendship rows the caller is part of, so asking about
@@ -210,12 +289,20 @@ struct SupabaseDataService: DataServiceProtocol {
 
     // MARK: - Feed
 
-    func fetchActivityFeed(for userId: UUID) async throws -> [FriendActivity] {
-        let activities: [ActivityRow] = try await client
+    func fetchActivityFeed(for userId: UUID, before: Date?) async throws -> [FriendActivity] {
+        var query = client
             .from("activities")
             .select()
+
+        // Keyset pagination rather than an offset: the feed grows at the top,
+        // so an offset would shift rows between pages.
+        if let before {
+            query = query.lt("created_at", value: before)
+        }
+
+        let activities: [ActivityRow] = try await query
             .order("created_at", ascending: false)
-            .limit(50)
+            .limit(Self.feedPageSize)
             .execute()
             .value
 
@@ -397,6 +484,16 @@ enum DataServiceError: LocalizedError {
     }
 }
 
+// Raised when an edge between the two people already exists. The unique index
+// covers both directions, so this usually means they got there first.
+enum FriendRequestError: LocalizedError {
+    case alreadyExists
+
+    var errorDescription: String? {
+        "You're already connected with them, or a request is pending."
+    }
+}
+
 // Turns whatever came back into something worth showing a person. Raw
 // PostgREST messages are useful in a log and useless on screen.
 enum DataLoadFailure {
@@ -458,14 +555,69 @@ private struct ProfileRow: Decodable {
 }
 
 private struct FriendshipRow: Decodable {
+    let id: UUID
     let requesterId: UUID
     let addresseeId: UUID
     let status: String
+    let createdAt: Date
 
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case requesterId = "requester_id"
+        case addresseeId = "addressee_id"
+        case createdAt = "created_at"
+    }
+
+    // Nil for a status the app doesn't know about, which is safer than
+    // guessing — an unrecognised edge is simply not shown.
+    var friendship: Friendship? {
+        guard let status = Friendship.Status(rawValue: status) else { return nil }
+        return Friendship(
+            id: id,
+            requesterId: requesterId,
+            addresseeId: addresseeId,
+            status: status,
+            createdAt: createdAt
+        )
+    }
+}
+
+private struct FriendshipInsert: Encodable {
+    let requesterId: UUID
+    let addresseeId: UUID
+
+    // status defaults to 'pending' in the schema.
     enum CodingKeys: String, CodingKey {
         case requesterId = "requester_id"
         case addresseeId = "addressee_id"
+    }
+}
+
+private struct FriendshipAccept: Encodable {
+    let status: String
+    let respondedAt: Date
+
+    enum CodingKeys: String, CodingKey {
         case status
+        case respondedAt = "responded_at"
+    }
+}
+
+private struct GroupPickParams: Encodable {
+    let friendIds: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case friendIds = "friend_ids"
+    }
+}
+
+private struct GroupPickRow: Decodable {
+    let restaurantId: UUID
+    let votes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case votes
+        case restaurantId = "restaurant_id"
     }
 }
 

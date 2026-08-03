@@ -12,6 +12,11 @@ struct FeedView: View {
                             ActivityCardView(activity: activity)
                         }
                         .buttonStyle(.plain)
+                        .task { await viewModel.loadMoreIfNeeded(currentItem: activity) }
+                    }
+
+                    if viewModel.isLoadingMore {
+                        ProgressView().padding(.vertical, AppTheme.spacingLG)
                     }
                 }
                 .padding(.horizontal, AppTheme.spacingLG)

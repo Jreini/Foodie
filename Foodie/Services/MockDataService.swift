@@ -254,6 +254,17 @@ class MockDataService: DataServiceProtocol {
 
     // MARK: - Liked restaurant IDs (restaurants the current user has positively rated)
 
+    // Mirrors the mock users' friendIds so the friends screen has something to
+    // show in previews: everyone is already an accepted friend.
+    lazy var friendships: [Friendship] = [
+        Friendship(id: UUID(), requesterId: Self.currentUserId, addresseeId: Self.friend1Id,
+                   status: .accepted, createdAt: Date()),
+        Friendship(id: UUID(), requesterId: Self.currentUserId, addresseeId: Self.friend2Id,
+                   status: .accepted, createdAt: Date()),
+        Friendship(id: UUID(), requesterId: Self.friend3Id, addresseeId: Self.currentUserId,
+                   status: .pending, createdAt: Date())
+    ]
+
     lazy var likedRestaurantIds: [UUID] = [
         Self.restaurant2Id,
         Self.restaurant4Id,
@@ -326,6 +337,62 @@ class MockDataService: DataServiceProtocol {
         return users.filter { user.friendIds.contains($0.id) }
     }
 
+    // MARK: - Friendships
+
+    func searchUsers(username: String) async throws -> [User] {
+        let term = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard term.count >= 2 else { return [] }
+        return users.filter { $0.username.lowercased().contains(term) }
+    }
+
+    func fetchFriendships() async throws -> [Friendship] {
+        friendships
+    }
+
+    func sendFriendRequest(to userId: UUID) async throws {
+        guard userId != Self.currentUserId else { return }
+        guard !friendships.contains(where: {
+            $0.otherUserId(from: Self.currentUserId) == userId
+        }) else {
+            throw FriendRequestError.alreadyExists
+        }
+
+        friendships.append(
+            Friendship(
+                id: UUID(),
+                requesterId: Self.currentUserId,
+                addresseeId: userId,
+                status: .pending,
+                createdAt: Date()
+            )
+        )
+    }
+
+    func acceptFriendRequest(friendshipId: UUID) async throws {
+        guard let index = friendships.firstIndex(where: { $0.id == friendshipId }) else { return }
+        let existing = friendships[index]
+        friendships[index] = Friendship(
+            id: existing.id,
+            requesterId: existing.requesterId,
+            addresseeId: existing.addresseeId,
+            status: .accepted,
+            createdAt: existing.createdAt
+        )
+    }
+
+    func removeFriendship(friendshipId: UUID) async throws {
+        friendships.removeAll { $0.id == friendshipId }
+    }
+
+    func groupPickCandidates(friendIds: [UUID]) async throws -> [UUID] {
+        // The real version counts overlap across everyone's likes and tasting
+        // lists in SQL. The mock just offers what the current user saved.
+        let tasting = tastingListEntries
+            .filter { $0.userId == Self.currentUserId }
+            .map(\.restaurantId)
+        return Array(Set(likedRestaurantIds + tasting))
+    }
+
     func fetchAllRestaurants() async throws -> [Restaurant] {
         restaurants.map(withRecomputedAverageTier)
     }
@@ -385,8 +452,9 @@ class MockDataService: DataServiceProtocol {
             .sorted { $0.dateAdded > $1.dateAdded }
     }
 
-    func fetchActivityFeed(for userId: UUID) async throws -> [FriendActivity] {
-        activityFeed
+    func fetchActivityFeed(for userId: UUID, before: Date?) async throws -> [FriendActivity] {
+        guard let before else { return activityFeed }
+        return activityFeed.filter { $0.timestamp < before }
     }
 
     func fetchLikedRestaurantIds(for userId: UUID) async throws -> [UUID] {

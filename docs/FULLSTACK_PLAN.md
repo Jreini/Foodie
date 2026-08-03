@@ -128,6 +128,10 @@ Keep every migration as SQL files in `supabase/migrations/` in this repo (use th
 2. Feed: one query over `activities` joined to profiles + restaurants, filtered by accepted friendships, paginated by `created_at`. Pull-to-refresh; realtime can come later.
 3. "Roll the Dice" for groups becomes real: intersect (or union-weight) the selected friends' likes + tasting lists server-side with a small SQL function (`rpc`).
 
+> **Phase 5 shipped.** `FriendsView` + `FriendsViewModel` (debounced username search, send/accept/decline/remove), keyset feed pagination, and `group_pick_candidates` as an RPC ranking restaurants by how many of the group saved them. Reached from the Profile friend count.
+>
+> The union-weight approach won over strict intersection: with two or three people, a strict intersection is usually empty. Ranking by vote count and picking randomly among the top few degrades gracefully instead. Note this is the first feature that **needs two accounts to test** — see `docs/PHASE5_SETUP.md`.
+
 ## Phase 6 — Shared lists (2–3 days)
 
 1. Create list, invite friends (must be accepted friends), members add restaurants with notes.
