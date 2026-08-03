@@ -334,6 +334,27 @@ class MockDataService: DataServiceProtocol {
         restaurants.first(where: { $0.id == id }).map(withRecomputedAverageTier)
     }
 
+    func fetchRestaurants(mapkitPlaceIds: [String]) async throws -> [Restaurant] {
+        let wanted = Set(mapkitPlaceIds)
+        return restaurants
+            .filter { $0.mapkitPlaceId.map(wanted.contains) ?? false }
+            .map(withRecomputedAverageTier)
+    }
+
+    @discardableResult
+    func ensureRestaurantPersisted(_ restaurant: Restaurant) async throws -> Restaurant {
+        if let existing = restaurants.first(where: {
+            $0.id == restaurant.id || ($0.mapkitPlaceId != nil && $0.mapkitPlaceId == restaurant.mapkitPlaceId)
+        }) {
+            return existing
+        }
+
+        var stored = restaurant
+        stored.isPersisted = true
+        restaurants.append(stored)
+        return stored
+    }
+
     // Return a copy of the restaurant with averageTier recomputed from the
     // baseline plus every review's tierPlacement. Keeps the mock consistent
     // with how a real backend would aggregate crowd placements.

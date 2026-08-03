@@ -24,12 +24,16 @@ struct RestaurantRowView: View {
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.textSecondary)
 
-                    Text("·")
-                        .foregroundStyle(AppTheme.textSecondary)
+                    // Price is unknown for MapKit results, so the separator
+                    // goes with it rather than dangling.
+                    if !restaurant.priceLevelString.isEmpty {
+                        Text("·")
+                            .foregroundStyle(AppTheme.textSecondary)
 
-                    Text(restaurant.priceLevelString)
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.textSecondary)
+                        Text(restaurant.priceLevelString)
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
                 }
             }
 

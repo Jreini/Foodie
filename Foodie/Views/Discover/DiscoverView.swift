@@ -24,9 +24,9 @@ struct DiscoverView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
-            .refreshable { await viewModel.loadRestaurants() }
+            .refreshable { await viewModel.loadNearby() }
             .overlay { statusOverlay }
-            .task { await viewModel.loadRestaurants() }
+            .task { await viewModel.loadNearby() }
         }
     }
 
@@ -41,11 +41,19 @@ struct DiscoverView: View {
                 Text(message)
             } actions: {
                 Button("Try Again") {
-                    Task { await viewModel.loadRestaurants() }
+                    Task { await viewModel.loadNearby() }
                 }
             }
         } else if !viewModel.searchText.isEmpty && viewModel.filteredRestaurants.isEmpty {
             ContentUnavailableView.search(text: viewModel.searchText)
+        } else if viewModel.hasLoadedOnce && viewModel.filteredRestaurants.isEmpty {
+            ContentUnavailableView {
+                Label("Nothing nearby", systemImage: "mappin.slash")
+            } description: {
+                Text(viewModel.isShowingSavedPlacesOnly
+                     ? "Turn on location access to find restaurants around you."
+                     : "No restaurants found in this area.")
+            }
         }
     }
 

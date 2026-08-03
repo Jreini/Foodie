@@ -99,6 +99,64 @@ struct SupabaseDataService: DataServiceProtocol {
         return rows.first?.restaurant
     }
 
+    func fetchRestaurants(mapkitPlaceIds: [String]) async throws -> [Restaurant] {
+        let unique = Array(Set(mapkitPlaceIds))
+        guard !unique.isEmpty else { return [] }
+
+        let rows: [RestaurantRow] = try await client
+            .from("restaurants")
+            .select()
+            .in("mapkit_place_id", values: unique)
+            .execute()
+            .value
+
+        return rows.map(\.restaurant)
+    }
+
+    @discardableResult
+    func ensureRestaurantPersisted(_ restaurant: Restaurant) async throws -> Restaurant {
+        // Already a database row — nothing to do.
+        if restaurant.isPersisted { return restaurant }
+
+        guard let placeId = restaurant.mapkitPlaceId else {
+            throw DataServiceError.unpersistablePlace
+        }
+
+        let userId = try currentUserId()
+
+        // Conflict is resolved on mapkit_place_id rather than id, which makes
+        // the database the arbiter of identity: whoever inserts first wins and
+        // everyone else gets that same row back. Two people opening the same
+        // restaurant can't create duplicates.
+        let rows: [RestaurantRow] = try await client
+            .from("restaurants")
+            .upsert(
+                RestaurantInsert(
+                    mapkitPlaceId: placeId,
+                    name: restaurant.name,
+                    cuisine: restaurant.cuisineType,
+                    address: restaurant.address,
+                    latitude: restaurant.latitude,
+                    longitude: restaurant.longitude,
+                    baselineTier: restaurant.baselineTier.value,
+                    createdBy: userId
+                ),
+                onConflict: "mapkit_place_id",
+                ignoreDuplicates: true
+            )
+            .select()
+            .execute()
+            .value
+
+        if let row = rows.first { return row.restaurant }
+
+        // ignoreDuplicates means an existing row comes back empty, so read it.
+        guard let existing = try await fetchRestaurants(mapkitPlaceIds: [placeId]).first else {
+            throw DataServiceError.unpersistablePlace
+        }
+        return existing
+    }
+
     // MARK: - Reviews
 
     func fetchReviews(for restaurantId: UUID) async throws -> [Review] {
@@ -325,6 +383,7 @@ struct SupabaseDataService: DataServiceProtocol {
 enum DataServiceError: LocalizedError {
     case notSignedIn
     case profileMissing
+    case unpersistablePlace
 
     var errorDescription: String? {
         switch self {
@@ -332,6 +391,8 @@ enum DataServiceError: LocalizedError {
             return "You're not signed in."
         case .profileMissing:
             return "Your profile couldn't be found."
+        case .unpersistablePlace:
+            return "This place couldn't be saved. Try searching for it again."
         }
     }
 }
@@ -410,6 +471,7 @@ private struct FriendshipRow: Decodable {
 
 private struct RestaurantRow: Decodable {
     let id: UUID
+    let mapkitPlaceId: String?
     let name: String
     let cuisine: String?
     let address: String?
@@ -421,10 +483,11 @@ private struct RestaurantRow: Decodable {
     let averageRating: Double
     let tags: [String]
     let hoursDescription: String?
-    let isOpenNow: Bool
+    let isOpenNow: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, cuisine, address, latitude, longitude, tags
+        case mapkitPlaceId = "mapkit_place_id"
         case priceLevel = "price_level"
         case baselineTier = "baseline_tier"
         case averageTier = "average_tier"
@@ -436,20 +499,43 @@ private struct RestaurantRow: Decodable {
     var restaurant: Restaurant {
         Restaurant(
             id: id,
+            mapkitPlaceId: mapkitPlaceId,
             name: name,
             cuisineType: cuisine ?? "",
             address: address ?? "",
             latitude: latitude ?? 0,
             longitude: longitude ?? 0,
             averageRating: averageRating,
-            priceLevel: priceLevel ?? 1,
+            priceLevel: priceLevel,
             imageName: "fork.knife.circle.fill",
-            hoursDescription: hoursDescription ?? "",
+            hoursDescription: hoursDescription,
             tags: tags,
             isOpenNow: isOpenNow,
             baselineTier: RestaurantTier(baselineTier),
-            averageTier: RestaurantTier(averageTier)
+            averageTier: RestaurantTier(averageTier),
+            isPersisted: true
         )
+    }
+}
+
+private struct RestaurantInsert: Encodable {
+    let mapkitPlaceId: String
+    let name: String
+    let cuisine: String
+    let address: String
+    let latitude: Double
+    let longitude: Double
+    let baselineTier: Double
+    let createdBy: UUID
+
+    // average_tier, average_rating and review_count are deliberately absent:
+    // they're trigger-maintained, and the column defaults cover a brand-new
+    // row until the first review arrives.
+    enum CodingKeys: String, CodingKey {
+        case name, cuisine, address, latitude, longitude
+        case mapkitPlaceId = "mapkit_place_id"
+        case baselineTier = "baseline_tier"
+        case createdBy = "created_by"
     }
 }
 

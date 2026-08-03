@@ -16,8 +16,9 @@ struct RestaurantCardView: View {
                     .background(AppTheme.primaryGradient)
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
 
-                // Open/closed badge
-                if restaurant.isOpenNow {
+                // Open/closed badge — absent when hours are unknown, which is
+                // the normal case for a place that came from MapKit.
+                if restaurant.isOpenNow == true {
                     Text("Open")
                         .font(.caption2)
                         .fontWeight(.bold)
