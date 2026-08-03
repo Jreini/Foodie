@@ -138,6 +138,12 @@ Keep every migration as SQL files in `supabase/migrations/` in this repo (use th
 2. Subscribe to Supabase **Realtime** on `list_entries` for the currently open list so a friend's add appears live — this is the one place realtime visibly wows, and it's included in the tier.
 3. Personal Tasting List can either stay its own table (as scoped above) or become "a list with one member" — decide when you build this; migrating is a small SQL script.
 
+> **Phase 6 shipped.** `SharedListsView` / `SharedListDetailView` under Decide → Shared Lists: create, invite friends, add places with notes, live updates via Realtime on `list_entries`.
+>
+> **Decision on item 3: the tasting list stays its own table.** It's wired through the app from Phase 3 and works; merging would be churn a user would never see. The two also mean different things — a private queue versus a collaboration.
+>
+> Realtime detail worth remembering: on any change the view model refetches rather than patching from the payload. One query handles insert/update/delete identically and can't drift out of sync, and a list holds a few dozen rows. The migration sets `replica identity full` so DELETE broadcasts carry enough to be filtered.
+
 ## Phase 7 — Photos + polish (2–4 days)
 
 1. Review photos → Supabase Storage bucket (`review-photos/{user_id}/...`), store paths on the review, render via CDN URLs. Downscale client-side (~1600px JPEG) before upload to protect the egress quota — this is the quota you'd realistically outgrow first.

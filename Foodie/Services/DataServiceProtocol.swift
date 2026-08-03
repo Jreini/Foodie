@@ -38,6 +38,27 @@ protocol DataServiceProtocol {
     // in, most-shared first. Computed server-side.
     func groupPickCandidates(friendIds: [UUID]) async throws -> [UUID]
 
+    // MARK: - Shared Lists
+
+    func fetchLists() async throws -> [SharedList]
+    func createList(name: String, emoji: String?) async throws -> SharedList
+    func deleteList(id: UUID) async throws
+
+    func fetchListEntries(listId: UUID) async throws -> [SharedListEntry]
+    @discardableResult
+    func addListEntry(listId: UUID, restaurantId: UUID, notes: String) async throws -> SharedListEntry
+    func removeListEntry(entryId: UUID) async throws
+
+    func fetchListMembers(listId: UUID) async throws -> [SharedListMember]
+    func addListMember(listId: UUID, userId: UUID) async throws
+    func removeListMember(listId: UUID, userId: UUID) async throws
+
+    // Emits whenever anyone changes this list's entries. The live
+    // implementation opens a Realtime channel; the mock returns a stream that
+    // never fires, so previews don't need a connection. Cancelling the
+    // consuming task tears the subscription down.
+    func listEntriesChanged(listId: UUID) -> AsyncStream<Void>
+
     // MARK: - Restaurants
 
     func fetchAllRestaurants() async throws -> [Restaurant]

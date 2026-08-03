@@ -40,6 +40,16 @@ struct DecisionEngineView: View {
                         )
                     }
                     .buttonStyle(.plain)
+
+                    NavigationLink(destination: SharedListsView()) {
+                        DecisionOptionCard(
+                            title: "Shared Lists",
+                            subtitle: "Build lists with friends, live",
+                            iconName: "person.2.fill",
+                            gradientColors: [Color.purple, Color.indigo]
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, AppTheme.spacingLG)
                 .padding(.bottom, AppTheme.spacingXL)

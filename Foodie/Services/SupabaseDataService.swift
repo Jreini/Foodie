@@ -139,6 +139,155 @@ struct SupabaseDataService: DataServiceProtocol {
         (error as? PostgrestError)?.code == "23505"
     }
 
+    // MARK: - Shared Lists
+
+    func fetchLists() async throws -> [SharedList] {
+        // No membership filter needed: the lists SELECT policy already limits
+        // this to lists the caller belongs to.
+        let rows: [ListRow] = try await client
+            .from("lists")
+            .select()
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        return rows.map(\.list)
+    }
+
+    func createList(name: String, emoji: String?) async throws -> SharedList {
+        let ownerId = try currentUserId()
+
+        let row: ListRow = try await client
+            .from("lists")
+            .insert(ListInsert(ownerId: ownerId, name: name, emoji: emoji))
+            .select()
+            .single()
+            .execute()
+            .value
+
+        // A trigger adds the owner to list_members — without it the list's own
+        // policies would hide it from its creator the instant it was made.
+        return row.list
+    }
+
+    func deleteList(id: UUID) async throws {
+        try await client
+            .from("lists")
+            .delete()
+            .eq("id", value: id)
+            .execute()
+    }
+
+    func fetchListEntries(listId: UUID) async throws -> [SharedListEntry] {
+        let rows: [ListEntryRow] = try await client
+            .from("list_entries")
+            .select()
+            .eq("list_id", value: listId)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        return rows.map(\.entry)
+    }
+
+    @discardableResult
+    func addListEntry(
+        listId: UUID,
+        restaurantId: UUID,
+        notes: String
+    ) async throws -> SharedListEntry {
+        let userId = try currentUserId()
+
+        let row: ListEntryRow = try await client
+            .from("list_entries")
+            .insert(
+                ListEntryInsert(
+                    listId: listId,
+                    restaurantId: restaurantId,
+                    addedBy: userId,
+                    notes: notes
+                )
+            )
+            .select()
+            .single()
+            .execute()
+            .value
+
+        return row.entry
+    }
+
+    func removeListEntry(entryId: UUID) async throws {
+        try await client
+            .from("list_entries")
+            .delete()
+            .eq("id", value: entryId)
+            .execute()
+    }
+
+    func fetchListMembers(listId: UUID) async throws -> [SharedListMember] {
+        let rows: [ListMemberRow] = try await client
+            .from("list_members")
+            .select()
+            .eq("list_id", value: listId)
+            .execute()
+            .value
+
+        return rows.compactMap(\.member)
+    }
+
+    func addListMember(listId: UUID, userId: UUID) async throws {
+        // The INSERT policy allows only the list owner, so an ordinary member
+        // attempting this is rejected server-side.
+        try await client
+            .from("list_members")
+            .insert(ListMemberInsert(listId: listId, userId: userId))
+            .execute()
+    }
+
+    func removeListMember(listId: UUID, userId: UUID) async throws {
+        try await client
+            .from("list_members")
+            .delete()
+            .eq("list_id", value: listId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    // MARK: - Realtime
+
+    func listEntriesChanged(listId: UUID) -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let task = Task {
+                let channel = client.channel("list-entries-\(listId.uuidString)")
+
+                // Filtered server-side, so this socket only carries changes for
+                // the list actually on screen. RLS applies on top: a
+                // non-member wouldn't receive these at all.
+                let changes = channel.postgresChange(
+                    AnyAction.self,
+                    schema: "public",
+                    table: "list_entries",
+                    filter: .eq("list_id", value: listId)
+                )
+
+                await channel.subscribe()
+
+                // The payload is deliberately ignored. Refetching on any change
+                // handles insert, update, and delete identically, and a list
+                // holds a few dozen rows at most — decoding three payload
+                // shapes to save one small query isn't worth the surface area.
+                for await _ in changes {
+                    continuation.yield()
+                }
+
+                await channel.unsubscribe()
+                await client.removeChannel(channel)
+            }
+
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     // RLS only exposes friendship rows the caller is part of, so asking about
     // someone else's friend list legitimately comes back empty.
     private func friendIds(of userId: UUID) async throws -> [UUID] {
@@ -600,6 +749,107 @@ private struct FriendshipAccept: Encodable {
     enum CodingKeys: String, CodingKey {
         case status
         case respondedAt = "responded_at"
+    }
+}
+
+// MARK: - Shared List Rows
+
+private struct ListRow: Decodable {
+    let id: UUID
+    let ownerId: UUID
+    let name: String
+    let emoji: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, emoji
+        case ownerId = "owner_id"
+        case createdAt = "created_at"
+    }
+
+    var list: SharedList {
+        SharedList(id: id, ownerId: ownerId, name: name, emoji: emoji, createdAt: createdAt)
+    }
+}
+
+private struct ListInsert: Encodable {
+    let ownerId: UUID
+    let name: String
+    let emoji: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, emoji
+        case ownerId = "owner_id"
+    }
+}
+
+private struct ListEntryRow: Decodable {
+    let id: UUID
+    let listId: UUID
+    let restaurantId: UUID
+    let addedBy: UUID?
+    let notes: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, notes
+        case listId = "list_id"
+        case restaurantId = "restaurant_id"
+        case addedBy = "added_by"
+        case createdAt = "created_at"
+    }
+
+    var entry: SharedListEntry {
+        SharedListEntry(
+            id: id,
+            listId: listId,
+            restaurantId: restaurantId,
+            addedBy: addedBy,
+            notes: notes,
+            createdAt: createdAt
+        )
+    }
+}
+
+private struct ListEntryInsert: Encodable {
+    let listId: UUID
+    let restaurantId: UUID
+    let addedBy: UUID
+    let notes: String
+
+    enum CodingKeys: String, CodingKey {
+        case notes
+        case listId = "list_id"
+        case restaurantId = "restaurant_id"
+        case addedBy = "added_by"
+    }
+}
+
+private struct ListMemberRow: Decodable {
+    let listId: UUID
+    let userId: UUID
+    let role: String
+
+    enum CodingKeys: String, CodingKey {
+        case role
+        case listId = "list_id"
+        case userId = "user_id"
+    }
+
+    var member: SharedListMember? {
+        guard let role = SharedListMember.Role(rawValue: role) else { return nil }
+        return SharedListMember(listId: listId, userId: userId, role: role)
+    }
+}
+
+private struct ListMemberInsert: Encodable {
+    let listId: UUID
+    let userId: UUID
+
+    // role defaults to 'member' in the schema.
+    enum CodingKeys: String, CodingKey {
+        case listId = "list_id"
+        case userId = "user_id"
     }
 }
 
