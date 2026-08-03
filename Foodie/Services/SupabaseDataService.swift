@@ -580,6 +580,14 @@ struct SupabaseDataService: DataServiceProtocol {
     }
 
     func deleteAccount() async throws {
+        let userId = try currentUserId()
+
+        // Photos must go first, and from the client. Postgres refuses direct
+        // deletes from storage.objects ("Use the Storage API instead"), and
+        // once auth.users is gone nobody holds permission to clear this folder
+        // ever again — the delete policy matches on the owner's own id.
+        await removeAllPhotos(for: userId)
+
         // A SECURITY DEFINER function rather than an Edge Function: it takes no
         // arguments and can only delete the caller's own row, so there's
         // nothing to tamper with and no secret key in play.
@@ -590,6 +598,30 @@ struct SupabaseDataService: DataServiceProtocol {
         // The session is now backed by a user that no longer exists; clearing
         // it locally is what returns the UI to the login screen.
         try? await client.auth.signOut()
+    }
+
+    // Best effort on purpose: someone who asked to delete their account
+    // shouldn't be trapped in it because a storage call failed. The account
+    // deletion below is the part that must not be blocked.
+    private func removeAllPhotos(for userId: UUID) async {
+        let folder = userId.uuidString.lowercased()
+
+        do {
+            let files = try await client.storage
+                .from(PhotoUploadService.bucket)
+                .list(path: folder)
+
+            let paths = files.map { "\(folder)/\($0.name)" }
+            guard !paths.isEmpty else { return }
+
+            _ = try await client.storage
+                .from(PhotoUploadService.bucket)
+                .remove(paths: paths)
+        } catch {
+            #if DEBUG
+            print("[Foodie] couldn't remove photos for \(folder): \(error)")
+            #endif
+        }
     }
 
     @discardableResult

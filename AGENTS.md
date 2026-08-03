@@ -69,6 +69,7 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Paths must be `<user_id>/<uuid>.jpg`, lowercased.** The bucket's INSERT policy checks the first path segment against `auth.uid()`, so the shape is load-bearing. **Swift's `UUID.uuidString` is uppercase and Postgres's `uuid::text` is lowercase** — comparing them unmodified fails every time. Lowercase any UUID that crosses into a SQL string comparison.
 - The bucket is **public-read** so images load from the CDN without a signed-URL round trip. Writes are still per-user.
 - Upload photos *before* writing the review row — a row pointing at a failed upload renders as broken images permanently.
+- **Never `delete from storage.objects` in SQL.** Postgres blocks it (42501, "Use the Storage API instead") to avoid orphaning the underlying files. Deletion has to go through the Storage API from an authenticated client — which is why account deletion clears photos client-side *before* removing the user.
 
 ### Database
 

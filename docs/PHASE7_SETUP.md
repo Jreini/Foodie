@@ -8,6 +8,7 @@ Supabase Dashboard → **SQL Editor** → paste and run **both**, in order:
 
 1. [`supabase/migrations/20260802000900_photos_and_account_deletion.sql`](../supabase/migrations/20260802000900_photos_and_account_deletion.sql) — creates the `review-photos` bucket with per-user write policies, and adds `delete_current_user()`.
 2. [`supabase/migrations/20260802001000_fix_storage_path_case.sql`](../supabase/migrations/20260802001000_fix_storage_path_case.sql) — **required**, or every upload fails with `403 new row violates row-level security policy`. Swift renders UUIDs uppercase and Postgres renders them lowercase, so the folder-name comparison never matched.
+3. [`supabase/migrations/20260802001100_fix_account_deletion.sql`](../supabase/migrations/20260802001100_fix_account_deletion.sql) — **required**, or deleting an account fails with `42501 Direct deletion from storage tables is not allowed`. Postgres guards `storage.objects` against direct deletes, so photo cleanup moved to the client.
 
 Verify:
 
@@ -44,7 +45,9 @@ Their reviews, likes, tasting list, friendships, list memberships, and activity 
 
 **Account deletion is a SQL function, not an Edge Function.** Deleting from `auth.users` needs privileges the publishable key doesn't have. The usual answer is an Edge Function holding the secret key; a `SECURITY DEFINER` function does the same job with nothing to deploy or maintain, and is arguably safer — it takes no arguments and can delete exactly one row, the caller's own. It also avoids needing the Supabase CLI, which isn't installed on this machine.
 
-**Storage objects are deleted explicitly.** Database rows cascade from `auth.users`; storage objects don't, so the function removes the user's photo folder first.
+**Storage cleanup happens on the client, not in SQL.** Database rows cascade from `auth.users`, but storage objects don't — and Postgres refuses a direct `delete from storage.objects` (it guards against orphaning the underlying files). So the app clears the photo folder through the Storage API *before* calling the deletion function, while the user is still authenticated. That's the only window it can happen in: the delete policy matches on the owner's own id, and that owner is about to stop existing.
+
+That cleanup is **best effort**. If it fails, the account is still deleted — someone who asked to leave shouldn't be trapped because a storage call errored. The cost is a few orphaned images; the alternative is failing a request the App Store requires you to honour.
 
 ## Push notifications
 
