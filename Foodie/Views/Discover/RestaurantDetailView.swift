@@ -371,6 +371,10 @@ private struct WriteReviewSheet: View {
     @State private var pickerSelections: [PhotosPickerItem] = []
     @State private var photos: [UIImage] = []
     @State private var isLoadingPhotos = false
+
+    // A multi-line TextEditor has no return key to dismiss with — Return
+    // inserts a newline — so the keyboard needs an explicit way out.
+    @FocusState private var isReviewFieldFocused: Bool
     // Initialize the tier placement at the restaurant's current crowd average
     // so the user starts near the consensus and nudges away if they disagree.
     @State private var tier: RestaurantTier
@@ -396,15 +400,11 @@ private struct WriteReviewSheet: View {
         NavigationStack {
             Form {
                 Section("Rating") {
-                    StarRatingView(rating: rating, starSize: 28)
-                        .onTapGesture { location in
-                            // Simple tap-based rating (approximate)
-                            let tappedStar = Int(location.x / 32) + 1
-                            rating = min(max(tappedStar, 1), 5)
-                        }
-
-                    // Manual stepper as backup
-                    Stepper("Stars: \(rating)", value: $rating, in: 1...5)
+                    // The stepper that used to sit here was a workaround for
+                    // the broken tap handling; the stars are directly tappable
+                    // now, so it's just clutter.
+                    StarRatingInput(rating: $rating, starSize: 28)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
 
                 Section {
@@ -425,6 +425,7 @@ private struct WriteReviewSheet: View {
                 Section("Your Review") {
                     TextEditor(text: $reviewText)
                         .frame(minHeight: 100)
+                        .focused($isReviewFieldFocused)
                 }
 
                 Section {
@@ -470,7 +471,15 @@ private struct WriteReviewSheet: View {
                             .disabled(reviewText.isEmpty)
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isReviewFieldFocused = false }
+                        .fontWeight(.semibold)
+                }
             }
+            // Swiping the form down also dismisses, so reaching for the button
+            // isn't the only way out.
+            .scrollDismissesKeyboard(.interactively)
             .alert(
                 "Does this look right?",
                 isPresented: $showFlagConfirmation,

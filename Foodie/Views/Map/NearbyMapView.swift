@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 // Nearby restaurants on a real map.
 //
@@ -10,6 +11,14 @@ struct NearbyMapView: View {
     @State private var viewModel = DiscoverViewModel()
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedRestaurant: Restaurant?
+
+    // Centre of the visible map, updated as the user pans.
+    @State private var visibleCenter: CLLocationCoordinate2D?
+
+    // Far enough that re-searching would actually return different places.
+    // Below this the results would be nearly identical, so the button would be
+    // noise rather than an offer.
+    private let researchThresholdMeters: CLLocationDistance = 1_200
 
     var body: some View {
         NavigationStack {
@@ -30,10 +39,14 @@ struct NearbyMapView: View {
                 MapUserLocationButton()
                 MapCompass()
             }
+            .onMapCameraChange(frequency: .onEnd) { context in
+                visibleCenter = context.region.center
+            }
             .navigationTitle("Map")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $viewModel.searchText, prompt: "Search nearby")
             .overlay(alignment: .top) { statusBanner }
+            .animation(.easeInOut(duration: 0.2), value: hasPannedAway)
             .safeAreaInset(edge: .bottom) { selectionCard }
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
@@ -50,12 +63,39 @@ struct NearbyMapView: View {
     private var statusBanner: some View {
         if viewModel.isLoading {
             banner(text: "Searching nearby…", systemImage: "location.magnifyingglass")
+        } else if hasPannedAway {
+            searchThisAreaButton
         } else if viewModel.isShowingSavedPlacesOnly {
             banner(
                 text: "Location off — showing saved places",
                 systemImage: "location.slash"
             )
         }
+    }
+
+    // Only offered once the map has moved far enough that a fresh search would
+    // return meaningfully different places.
+    private var hasPannedAway: Bool {
+        guard let visibleCenter, let searched = viewModel.lastSearchCenter else { return false }
+
+        let from = CLLocation(latitude: searched.latitude, longitude: searched.longitude)
+        let to = CLLocation(latitude: visibleCenter.latitude, longitude: visibleCenter.longitude)
+        return from.distance(from: to) > researchThresholdMeters
+    }
+
+    private var searchThisAreaButton: some View {
+        Button {
+            Task { await viewModel.loadNearby(at: visibleCenter) }
+        } label: {
+            Label("Search this area", systemImage: "arrow.trianglehead.clockwise")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, AppTheme.spacingLG)
+                .padding(.vertical, AppTheme.spacingMD)
+                .background(.thinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, AppTheme.spacingSM)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private func banner(text: String, systemImage: String) -> some View {

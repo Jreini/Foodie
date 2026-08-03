@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 import Observation
 
 @Observable
@@ -6,7 +7,13 @@ import Observation
 class DecisionEngineViewModel {
     var likedRestaurants: [Restaurant] = []
     var tastingListRestaurants: [Restaurant] = []
+    // Places anyone has interacted with — the pool the group pick draws from,
+    // since the overlap query returns database ids.
     var allRestaurants: [Restaurant] = []
+    // Live MapKit results around the user. "Discover a New Taste" needs these:
+    // the restaurants table only holds places somebody already saved, which is
+    // precisely the set a "somewhere new" suggestion should avoid.
+    var nearbyRestaurants: [Restaurant] = []
     var friends: [User] = []
     // The result after a "pick" action
     var pickedRestaurant: Restaurant? = nil
@@ -16,6 +23,7 @@ class DecisionEngineViewModel {
     var errorMessage: String?
 
     private let dataService: any DataServiceProtocol
+    private let locationProvider = LocationProvider()
 
     init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
@@ -45,6 +53,18 @@ class DecisionEngineViewModel {
         } catch {
             errorMessage = DataLoadFailure.message(for: error)
         }
+
+        // Non-fatal: without it "Discover a New Taste" falls back to saved
+        // places, which is worse but not broken.
+        await loadNearbyRestaurants()
+    }
+
+    private func loadNearbyRestaurants() async {
+        guard let location = await locationProvider.currentLocation() else { return }
+        nearbyRestaurants = (try? await PlaceSearchService.searchRestaurants(
+            matching: nil,
+            near: location.coordinate
+        )) ?? []
     }
 
     // Picks a random restaurant from liked places + tasting list combined
@@ -91,10 +111,13 @@ class DecisionEngineViewModel {
     }
 
     // Nobody in the group has saved anything in common — better to suggest
-    // something than to show an empty result.
+    // something than to show an empty result. Falls through to nearby places
+    // so this still works before anyone has saved anything at all.
     private func fallbackPick() -> Restaurant? {
         let ownPool = Array(Set(likedRestaurants + tastingListRestaurants))
-        return (ownPool.isEmpty ? allRestaurants : ownPool).randomElement()
+        if let pick = ownPool.randomElement() { return pick }
+        if let pick = allRestaurants.randomElement() { return pick }
+        return nearbyRestaurants.randomElement()
     }
 
     // Animated version of group pick used by Roll the Dice
@@ -114,14 +137,28 @@ class DecisionEngineViewModel {
         isAnimatingPick = false
     }
 
-    // Suggests a restaurant nobody in the group has visited
-    // When selectedFriendIds is empty, acts as a solo "discover a new taste"
+    // Suggests somewhere nearby you haven't saved yet.
+    //
+    // Draws from live MapKit results rather than the restaurants table: that
+    // table only contains places somebody already interacted with, so using it
+    // would recommend exactly the places this is meant to avoid.
     func discoverNewTaste(selectedFriendIds: [UUID] = []) -> Restaurant? {
-        // In a real app, exclude places anyone in the group has reviewed
-        // For mock: exclude the user's liked + tasting list restaurants
-        let visitedIds = Set(likedRestaurants.map { $0.id } + tastingListRestaurants.map { $0.id })
-        let unvisited = allRestaurants.filter { !visitedIds.contains($0.id) }
-        return unvisited.randomElement() ?? allRestaurants.randomElement()
+        let pool = nearbyRestaurants.isEmpty ? allRestaurants : nearbyRestaurants
+        guard !pool.isEmpty else { return nil }
+
+        let saved = likedRestaurants + tastingListRestaurants
+        let savedIds = Set(saved.map(\.id))
+        // MapKit results carry a derived id until they're persisted, so the
+        // place id is what actually matches them against saved rows.
+        let savedPlaceIds = Set(saved.compactMap(\.mapkitPlaceId))
+
+        let unvisited = pool.filter { candidate in
+            if savedIds.contains(candidate.id) { return false }
+            if let placeId = candidate.mapkitPlaceId, savedPlaceIds.contains(placeId) { return false }
+            return true
+        }
+
+        return unvisited.randomElement() ?? pool.randomElement()
     }
 
     func pickRandomFromTastingList() -> Restaurant? {
