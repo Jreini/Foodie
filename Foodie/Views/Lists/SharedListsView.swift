@@ -5,6 +5,9 @@ struct SharedListsView: View {
     @State private var viewModel = SharedListsViewModel()
     @State private var showCreateSheet = false
 
+    // Grows with the user's text size so the emoji tile never crops its glyph.
+    @ScaledMetric(relativeTo: .title2) private var iconSize: CGFloat = 40
+
     var body: some View {
         List {
             if let message = viewModel.errorMessage {
@@ -54,7 +57,10 @@ struct SharedListsView: View {
         HStack(spacing: AppTheme.spacingMD) {
             Text(list.displayEmoji)
                 .font(.title2)
-                .frame(width: 40, height: 40)
+                // Scaled, not fixed at 40: the font grows with Dynamic Type but
+                // a hard-coded frame doesn't, so at larger text sizes the glyph
+                // was being clipped away by the rounded rect.
+                .frame(width: iconSize, height: iconSize)
                 .background(AppTheme.tagBackground)
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
 
