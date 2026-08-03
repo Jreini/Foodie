@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct RestaurantDetailView: View {
     let restaurant: Restaurant
@@ -304,6 +305,16 @@ private struct ReviewCard: View {
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.textPrimary)
 
+            if !review.photoNames.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: AppTheme.spacingSM) {
+                        ForEach(review.photoNames, id: \.self) { path in
+                            reviewPhoto(path)
+                        }
+                    }
+                }
+            }
+
             if !review.moodTags.isEmpty {
                 MoodTagRow(tags: review.moodTags)
             }
@@ -315,6 +326,28 @@ private struct ReviewCard: View {
         .padding(AppTheme.spacingLG)
         .cardStyle()
         .padding(.horizontal, AppTheme.spacingLG)
+    }
+
+    // Mock reviews carry SF Symbol names rather than storage paths, so fall
+    // back to a symbol when the path doesn't resolve to a URL.
+    @ViewBuilder
+    private func reviewPhoto(_ path: String) -> some View {
+        if let url = PhotoUploadService.publicURL(for: path) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundStyle(AppTheme.textSecondary)
+                default:
+                    ProgressView()
+                }
+            }
+            .frame(width: 120, height: 120)
+            .background(AppTheme.tagBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
+        }
     }
 }
 
@@ -335,6 +368,9 @@ private struct WriteReviewSheet: View {
     @State private var reviewText: String = ""
     @State private var isPosting = false
     @State private var postError: String?
+    @State private var pickerSelections: [PhotosPickerItem] = []
+    @State private var photos: [UIImage] = []
+    @State private var isLoadingPhotos = false
     // Initialize the tier placement at the restaurant's current crowd average
     // so the user starts near the consensus and nudges away if they disagree.
     @State private var tier: RestaurantTier
@@ -391,6 +427,25 @@ private struct WriteReviewSheet: View {
                         .frame(minHeight: 100)
                 }
 
+                Section {
+                    photoStrip
+
+                    PhotosPicker(
+                        selection: $pickerSelections,
+                        maxSelectionCount: 4,
+                        matching: .images
+                    ) {
+                        Label(
+                            photos.isEmpty ? "Add Photos" : "Change Photos",
+                            systemImage: "photo.on.rectangle.angled"
+                        )
+                    }
+                } header: {
+                    Text("Photos")
+                } footer: {
+                    Text("Photos are shrunk on your device before upload.")
+                }
+
                 if let postError {
                     Section {
                         Text(postError)
@@ -429,7 +484,54 @@ private struct WriteReviewSheet: View {
                 },
                 message: { Text(pendingFlagMessage) }
             )
+            .onChange(of: pickerSelections) { _, items in
+                Task { await loadPickedPhotos(items) }
+            }
         }
+    }
+
+    @ViewBuilder
+    private var photoStrip: some View {
+        if isLoadingPhotos {
+            HStack {
+                ProgressView()
+                Text("Loading photos…").foregroundStyle(AppTheme.textSecondary)
+            }
+        } else if !photos.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: AppTheme.spacingSM) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { _, photo in
+                        Image(uiImage: photo)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 76, height: 76)
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
+                    }
+                }
+                .padding(.vertical, AppTheme.spacingXS)
+            }
+        }
+    }
+
+    // PhotosPickerItem only hands over data on request, so decode after the
+    // picker closes rather than blocking it.
+    private func loadPickedPhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else {
+            photos = []
+            return
+        }
+
+        isLoadingPhotos = true
+        defer { isLoadingPhotos = false }
+
+        var loaded: [UIImage] = []
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                loaded.append(image)
+            }
+        }
+        photos = loaded
     }
 
     // Evaluate the placement and either show the confirmation alert or post
@@ -455,6 +557,11 @@ private struct WriteReviewSheet: View {
 
         do {
             let restaurantId = try await resolveRestaurantId()
+
+            // Photos go up first: a review row referencing an upload that
+            // failed would render as broken images forever.
+            let photoPaths = try await uploadPhotos()
+
             try await dataService.submitReview(
                 restaurantId: restaurantId,
                 rating: rating,
@@ -462,6 +569,7 @@ private struct WriteReviewSheet: View {
                 // Mood tags don't have an input control yet; the column and the
                 // model field are both ready for when one lands.
                 moodTags: [],
+                photoPaths: photoPaths,
                 tierPlacement: tier
             )
             await onPosted()
@@ -469,6 +577,17 @@ private struct WriteReviewSheet: View {
         } catch {
             postError = DataLoadFailure.message(for: error)
         }
+    }
+
+    private func uploadPhotos() async throws -> [String] {
+        guard !photos.isEmpty else { return [] }
+
+        let currentUser = try await dataService.fetchCurrentUser()
+        var paths: [String] = []
+        for photo in photos {
+            paths.append(try await PhotoUploadService.upload(photo, userId: currentUser.id))
+        }
+        return paths
     }
 }
 

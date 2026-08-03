@@ -5,6 +5,9 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showEditProfile = false
     @State private var showSignOutConfirmation = false
+    @State private var showDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var deleteError: String?
 
     var body: some View {
         NavigationStack {
@@ -31,6 +34,12 @@ struct ProfileView: View {
                             } label: {
                                 Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                             }
+
+                            Button(role: .destructive) {
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete Account", systemImage: "trash")
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -54,6 +63,34 @@ struct ProfileView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
+            .confirmationDialog(
+                "Delete your account?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Everything", role: .destructive) {
+                    Task { await deleteAccount() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes your profile, reviews, photos, lists, and friends. It can't be undone.")
+            }
+            .alert("Couldn't delete account", isPresented: .constant(deleteError != nil)) {
+                Button("OK") { deleteError = nil }
+            } message: {
+                Text(deleteError ?? "")
+            }
+            .overlay {
+                if isDeletingAccount {
+                    ZStack {
+                        Color.black.opacity(0.2).ignoresSafeArea()
+                        ProgressView("Deleting…")
+                            .padding(AppTheme.spacingXL)
+                            .background(AppTheme.cardBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusLG))
+                    }
+                }
+            }
             .sheet(isPresented: $showEditProfile) {
                 if let profile = auth.profile {
                     EditProfileView(profile: profile)
@@ -64,6 +101,20 @@ struct ProfileView: View {
             }
             .refreshable { await viewModel.loadProfile() }
             .task { await viewModel.loadProfile() }
+        }
+    }
+
+    // The service signs out after a successful delete, which flips AuthManager
+    // to .signedOut and swaps this whole screen for the login view.
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        deleteError = nil
+        defer { isDeletingAccount = false }
+
+        do {
+            try await DataServices.current.deleteAccount()
+        } catch {
+            deleteError = DataLoadFailure.message(for: error)
         }
     }
 

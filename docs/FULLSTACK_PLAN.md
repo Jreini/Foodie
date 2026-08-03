@@ -151,6 +151,16 @@ Keep every migration as SQL files in `supabase/migrations/` in this repo (use th
 3. Empty states for a young network (no friends yet, no nearby reviews).
 4. Push notifications (friend request, "X added to your shared list") via APNs from a Supabase edge function or database webhook — free, but a chunk of setup; fine to defer past v1.
 
+> **Phase 7 shipped.** Review photos in Supabase Storage (downscaled on device to 1600px/JPEG 0.8), a public-read bucket with per-user write policies, and account deletion. Empty states landed incrementally across Phases 3–6, so nothing extra was needed there. See `docs/PHASE7_SETUP.md`.
+>
+> **Account deletion is a `SECURITY DEFINER` SQL function, not an Edge Function.** It takes no arguments and can delete only the caller's own row, so there's nothing to tamper with — and it needs no deployment or secret key. Storage objects are removed explicitly since they don't cascade.
+>
+> **Push notifications deferred**, as this item allowed. They need APNs certificates, a webhook or Edge Function, and device-token storage — real setup for something not required to ship.
+>
+> ---
+>
+> **The plan is fully built.** Open bugs are tracked in `docs/KNOWN_ISSUES.md`.
+
 ---
 
 ## Order of operations & rough timeline

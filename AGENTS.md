@@ -14,7 +14,9 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Phase 4 complete:** restaurants come from MapKit search near the user, merged with whatever crowd data exists; the Map tab is real. See `docs/PHASE4_SETUP.md`.
 - **Phase 5 complete:** friend search/request/accept, a feed that paginates, and a real group pick. See `docs/PHASE5_SETUP.md`. **Testing friends needs two accounts** — sign in with Apple on one device and Google on another.
 - **Phase 6 complete:** shared lists with live Realtime updates, under Decide → Shared Lists. See `docs/PHASE6_SETUP.md`. Also needs two accounts to see the live part.
-- **Next up: Phase 7** — review photos to Supabase Storage, account deletion (an App Store requirement), and empty states. Push notifications can be deferred past v1.
+- **Phase 7 complete:** review photos in Supabase Storage and account deletion. See `docs/PHASE7_SETUP.md`.
+- **The plan is fully built.** Push notifications were deliberately deferred — see the end of `docs/PHASE7_SETUP.md`.
+- **Open bugs live in `docs/KNOWN_ISSUES.md`.** Read it before chasing something that looks broken; it records what's already been ruled out.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -58,6 +60,16 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **A place is persisted only when someone interacts with it** (review, like, tasting list). Browsing writes nothing, which is what keeps the table small. `ensureRestaurantPersisted` is the single entry point, and every write path calls it first.
 - **The database owns identity, not the client.** The upsert conflicts on `mapkit_place_id`, so concurrent taps on the same restaurant converge on one row. The client-side UUID is derived deterministically from the place id (`PlaceSearchService.derivedId`) purely so SwiftUI has a stable handle before a row exists.
 - `baselineTier` for a new place is a coarse guess from the POI category (MapKit has no fast-food category). That's what `baseline_tier` is for — the first real placement starts correcting it.
+
+### Photos and Storage
+
+`PhotoUploadService` handles review photos in the `review-photos` bucket.
+
+- **Always downscale before upload** (1600px long edge, JPEG 0.8). Egress is the quota this app would outgrow first, and every view counts again — uploading originals would burn it fast.
+- **Paths must be `<user_id>/<uuid>.jpg`, lowercased.** The bucket's INSERT policy checks the first path segment against `auth.uid()`, so the shape is load-bearing. **Swift's `UUID.uuidString` is uppercase and Postgres's `uuid::text` is lowercase** — comparing them unmodified fails every time. Lowercase any UUID that crosses into a SQL string comparison.
+- The bucket is **public-read** so images load from the CDN without a signed-URL round trip. Writes are still per-user.
+- Upload photos *before* writing the review row — a row pointing at a failed upload renders as broken images permanently.
+- **Never `delete from storage.objects` in SQL.** Postgres blocks it (42501, "Use the Storage API instead") to avoid orphaning the underlying files. Deletion has to go through the Storage API from an authenticated client — which is why account deletion clears photos client-side *before* removing the user.
 
 ### Database
 

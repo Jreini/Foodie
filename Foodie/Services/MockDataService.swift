@@ -613,12 +613,17 @@ class MockDataService: DataServiceProtocol {
         }
     }
 
+    func deleteAccount() async throws {
+        // Nothing to delete in memory; previews never have a real account.
+    }
+
     @discardableResult
     func submitReview(
         restaurantId: UUID,
         rating: Int,
         text: String,
         moodTags: [String],
+        photoPaths: [String],
         tierPlacement: RestaurantTier
     ) async throws -> Review {
         let review = Review(
@@ -628,7 +633,7 @@ class MockDataService: DataServiceProtocol {
             rating: rating,
             text: text,
             moodTags: moodTags,
-            photoNames: [],
+            photoNames: photoPaths,
             createdAt: Date(),
             tierPlacement: tierPlacement
         )
