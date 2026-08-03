@@ -22,7 +22,7 @@ enum PlaceSearchService {
         near coordinate: CLLocationCoordinate2D,
         radiusMeters: CLLocationDistance = 5_000
     ) async throws -> [Restaurant] {
-        let request = MKLocalSearchRequest()
+        let request = MKLocalSearch.Request()
 
         let trimmed = query?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         // An empty query returns nothing, so an unfiltered browse asks for the
