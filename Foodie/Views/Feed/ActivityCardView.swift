@@ -1,34 +1,56 @@
 import SwiftUI
 
-// A single card in the activity feed showing what a friend did
+// A single card in the activity feed showing what a friend did.
+//
+// The card holds two links rather than being one: the top row goes to the
+// person, the rest goes to the restaurant. They're siblings, not nested — a
+// `NavigationLink` inside another one doesn't work.
 struct ActivityCardView: View {
     let activity: FriendActivity
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
-            // User info row
-            HStack(spacing: AppTheme.spacingSM) {
-                ProfileImageView(systemName: activity.user.profileImageName, size: 36)
+            NavigationLink(value: activity.user) {
+                userRow
+            }
+            .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text(activity.user.name)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
+            NavigationLink(value: activity.restaurant) {
+                restaurantSummary
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(AppTheme.spacingLG)
+        .cardStyle()
+    }
 
-                        Text(activity.activityLabel)
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.textSecondary)
-                    }
+    private var userRow: some View {
+        HStack(spacing: AppTheme.spacingSM) {
+            ProfileImageView(user: activity.user, size: 36)
 
-                    Text(activity.timeAgoString)
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(activity.user.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text(activity.activityLabel)
+                        .font(.subheadline)
                         .foregroundStyle(AppTheme.textSecondary)
                 }
 
-                Spacer()
+                Text(activity.timeAgoString)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
 
+            Spacer()
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var restaurantSummary: some View {
+        VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
             // Restaurant info
             HStack(spacing: AppTheme.spacingMD) {
                 Image(systemName: activity.restaurant.imageName)
@@ -79,8 +101,9 @@ struct ActivityCardView: View {
                 MoodTagRow(tags: review.moodTags)
             }
         }
-        .padding(AppTheme.spacingLG)
-        .cardStyle()
+        // Without this the gaps between the rows aren't part of the link, and
+        // the tap target has holes in it.
+        .contentShape(Rectangle())
     }
 }
 
@@ -88,8 +111,10 @@ struct ActivityCardView: View {
     // The mock's feed is built lazily, so reach for it directly rather than
     // through the now-async protocol method.
     let service = MockDataService()
-    if let first = service.activityFeed.first {
-        ActivityCardView(activity: first)
-            .padding()
+    NavigationStack {
+        if let first = service.activityFeed.first {
+            ActivityCardView(activity: first)
+                .padding()
+        }
     }
 }

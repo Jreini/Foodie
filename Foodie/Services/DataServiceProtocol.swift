@@ -17,6 +17,11 @@ protocol DataServiceProtocol {
     func fetchAllUsers() async throws -> [User]
     func fetchFriends(for userId: UUID) async throws -> [User]
 
+    // How many accepted friends someone has. Counted server-side because the
+    // friendships policy only returns edges the caller is part of — asking the
+    // client to count them would report 1 for every friend.
+    func friendCount(for userId: UUID) async throws -> Int
+
     // MARK: - Friendships
 
     // Username prefix/substring search. Excludes nobody — filtering out people

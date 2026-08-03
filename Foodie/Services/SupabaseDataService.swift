@@ -63,6 +63,15 @@ struct SupabaseDataService: DataServiceProtocol {
         return rows.map { $0.user(friendIds: []) }
     }
 
+    func friendCount(for userId: UUID) async throws -> Int {
+        // SECURITY DEFINER on the server, which is the only way to get this
+        // number: RLS hides other people's friendship rows from the caller.
+        try await client
+            .rpc("friend_count", params: FriendCountParams(target: userId))
+            .execute()
+            .value
+    }
+
     // MARK: - Friendships
 
     func searchUsers(username: String) async throws -> [User] {
@@ -584,9 +593,10 @@ struct SupabaseDataService: DataServiceProtocol {
 
         // Photos must go first, and from the client. Postgres refuses direct
         // deletes from storage.objects ("Use the Storage API instead"), and
-        // once auth.users is gone nobody holds permission to clear this folder
-        // ever again — the delete policy matches on the owner's own id.
-        await removeAllPhotos(for: userId)
+        // once auth.users is gone nobody holds permission to clear these folders
+        // ever again — the delete policies match on the owner's own id.
+        await removeAllFiles(for: userId, in: PhotoUploadService.reviewBucket)
+        await removeAllFiles(for: userId, in: PhotoUploadService.avatarBucket)
 
         // A SECURITY DEFINER function rather than an Edge Function: it takes no
         // arguments and can only delete the caller's own row, so there's
@@ -602,24 +612,24 @@ struct SupabaseDataService: DataServiceProtocol {
 
     // Best effort on purpose: someone who asked to delete their account
     // shouldn't be trapped in it because a storage call failed. The account
-    // deletion below is the part that must not be blocked.
-    private func removeAllPhotos(for userId: UUID) async {
+    // deletion above is the part that must not be blocked.
+    private func removeAllFiles(for userId: UUID, in bucket: String) async {
         let folder = userId.uuidString.lowercased()
 
         do {
             let files = try await client.storage
-                .from(PhotoUploadService.bucket)
+                .from(bucket)
                 .list(path: folder)
 
             let paths = files.map { "\(folder)/\($0.name)" }
             guard !paths.isEmpty else { return }
 
             _ = try await client.storage
-                .from(PhotoUploadService.bucket)
+                .from(bucket)
                 .remove(paths: paths)
         } catch {
             #if DEBUG
-            print("[Foodie] couldn't remove photos for \(folder): \(error)")
+            print("[Foodie] couldn't remove \(bucket) files for \(folder): \(error)")
             #endif
         }
     }
@@ -726,12 +736,12 @@ private struct ProfileRow: Decodable {
     let username: String?
     let name: String?
     let bio: String
-    let avatarURL: String?
+    let avatarPath: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, username, name, bio
-        case avatarURL = "avatar_url"
+        case avatarPath = "avatar_path"
         case createdAt = "created_at"
     }
 
@@ -740,14 +750,16 @@ private struct ProfileRow: Decodable {
             id: id,
             name: name ?? username ?? "Foodie",
             username: username ?? "",
-            // Avatar uploads arrive in Phase 7; until then everyone gets the
-            // same SF Symbol, which is a UI concern rather than missing data.
-            profileImageName: "person.circle.fill",
+            avatarPath: avatarPath,
             bio: bio,
             joinDate: createdAt,
             friendIds: friendIds
         )
     }
+}
+
+private struct FriendCountParams: Encodable {
+    let target: UUID
 }
 
 private struct FriendshipRow: Decodable {

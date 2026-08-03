@@ -56,6 +56,10 @@ struct DecisionEngineView: View {
             }
             .background(AppTheme.screenBackground)
             .navigationTitle("Decide")
+            // Registered here rather than deeper, because this is the root of
+            // the tab's stack and the reviewer links inside a restaurant detail
+            // screen need somewhere to land.
+            .personProfileDestination()
         }
     }
 }

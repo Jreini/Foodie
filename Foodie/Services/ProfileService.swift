@@ -73,6 +73,22 @@ enum ProfileService {
             .value
     }
 
+    // Points the profile at an uploaded avatar, or clears it when passed nil.
+    //
+    // Separate from `updateProfile` rather than another parameter, because
+    // "leave the picture alone" and "remove the picture" are both nil there and
+    // the distinction matters — one writes nothing, the other writes null.
+    static func updateAvatar(id: UUID, path: String?) async throws -> Profile {
+        try await SupabaseService.client
+            .from(table)
+            .update(AvatarEdit(avatarPath: path))
+            .eq("id", value: id)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
     // MARK: - Payloads
 
     private struct UsernameRow: Decodable {
@@ -88,6 +104,22 @@ enum ProfileService {
     private struct ProfileEdit: Encodable {
         let name: String?
         let bio: String
+    }
+
+    private struct AvatarEdit: Encodable {
+        let avatarPath: String?
+
+        enum CodingKeys: String, CodingKey {
+            case avatarPath = "avatar_path"
+        }
+
+        // Hand-written so removing a picture actually writes null. The
+        // synthesized version uses `encodeIfPresent` for optionals, which would
+        // drop the key entirely and leave the old avatar in place.
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(avatarPath, forKey: .avatarPath)
+        }
     }
 }
 

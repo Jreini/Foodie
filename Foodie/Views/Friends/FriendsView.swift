@@ -2,9 +2,13 @@ import SwiftUI
 
 // Find people, answer requests, manage friends.
 //
-// Reached from the friend count on Profile. Everything here writes to
-// `friendships`, whose policies mean the database — not this screen — decides
-// who may accept what.
+// Reached from the friend count on Profile and the Friends button on the Feed.
+// Everything here writes to `friendships`, whose policies mean the database —
+// not this screen — decides who may accept what.
+//
+// Rows for people you already have an edge with push their profile. Search
+// results deliberately don't: there, the row *is* the Add button, and a tap
+// that sometimes adds and sometimes navigates would be worse than either.
 struct FriendsView: View {
     @State private var viewModel = FriendsViewModel()
 
@@ -61,7 +65,7 @@ struct FriendsView: View {
         Section("Requests") {
             ForEach(viewModel.incomingRequests) { request in
                 HStack {
-                    personLabel(request.user)
+                    personLink(request.user)
                     Spacer()
 
                     // Two destructive-adjacent actions side by side, so the
@@ -85,12 +89,16 @@ struct FriendsView: View {
     private var outgoingSection: some View {
         Section("Sent") {
             ForEach(viewModel.outgoingRequests) { request in
-                HStack {
-                    personLabel(request.user)
-                    Spacer()
-                    Text("Pending")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.textSecondary)
+                // Nothing else on this row competes for the tap, so the whole
+                // row navigates.
+                NavigationLink(value: request.user) {
+                    HStack {
+                        personLabel(request.user)
+                        Spacer()
+                        Text("Pending")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
                 }
             }
         }
@@ -103,12 +111,18 @@ struct FriendsView: View {
                     .foregroundStyle(AppTheme.textSecondary)
             } else {
                 ForEach(viewModel.friends) { friend in
-                    personLabel(friend)
-                        .swipeActions {
-                            Button("Remove", role: .destructive) {
-                                Task { await viewModel.removeFriend(friend) }
-                            }
+                    // A whole-row NavigationLink here, rather than the wrapped
+                    // label the other sections use, so the row gets a
+                    // disclosure chevron — the only rows that are entirely
+                    // tappable are the ones with nothing else on them.
+                    NavigationLink(value: friend) {
+                        personLabel(friend)
+                    }
+                    .swipeActions {
+                        Button("Remove", role: .destructive) {
+                            Task { await viewModel.removeFriend(friend) }
                         }
+                    }
                 }
             }
         }
@@ -164,9 +178,19 @@ struct FriendsView: View {
         }
     }
 
+    // Used where the row also carries buttons. Styled `.plain` so it sizes to
+    // the person's name and picture instead of claiming the whole row — a
+    // full-width link would sit under Accept and Decline and swallow their taps.
+    private func personLink(_ user: User) -> some View {
+        NavigationLink(value: user) {
+            personLabel(user)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func personLabel(_ user: User) -> some View {
         HStack(spacing: AppTheme.spacingMD) {
-            ProfileImageView(systemName: user.profileImageName, size: 36)
+            ProfileImageView(user: user, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.name)
@@ -202,5 +226,6 @@ struct FriendsView: View {
 #Preview {
     NavigationStack {
         FriendsView()
+            .personProfileDestination()
     }
 }
