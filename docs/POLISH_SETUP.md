@@ -30,6 +30,10 @@ Zero. Every remaining restaurant is a real MapKit place somebody interacted with
 
 **Discover a New Taste** now draws from live MapKit results instead of the `restaurants` table. That table only holds places somebody already saved — precisely the set a "somewhere new" suggestion should be avoiding. It excludes anything you've liked or added to your tasting list, matching on MapKit place id as well as row id, since an unsaved search result carries a derived id until it's persisted.
 
+**Liking restaurants.** The `likes` table, RLS policies, `setLiked`, and the Profile "Liked" tab have existed since Phase 3 — there was simply never a button to call them. A heart now sits alongside Tasting List and Review on the restaurant page. Like a place and it appears under Profile → Liked, in your friends' feeds (the activity trigger fires on insert), and in the pool that Roll the Dice draws from for group picks.
+
+Like any other interaction, liking a MapKit search result is what creates its database row.
+
 ## Mock data
 
 `MockDataService` stays, but it can only ever run inside an Xcode preview — `DataServices.current` picks it solely when `XCODE_RUNNING_FOR_PREVIEWS` is set. With the seeded rows gone, there's no fake data anywhere in the shipping app or the live database.

@@ -8,6 +8,7 @@ struct RestaurantDetailView: View {
     @State private var reviewersById: [UUID: User] = [:]
     @State private var showWriteReview = false
     @State private var isOnTastingList = false
+    @State private var isLiked = false
     @State private var errorMessage: String?
 
     // The database row for this place, once we know there is one. A MapKit
@@ -91,17 +92,36 @@ struct RestaurantDetailView: View {
                 // to load — not an error.
                 reviews = []
                 isOnTastingList = false
+                isLiked = false
                 errorMessage = nil
                 return
             }
 
             async let reviewsTask = dataService.fetchReviews(for: rowId)
             async let tastingTask = dataService.fetchTastingList(for: currentUser.id)
+            async let likedTask = dataService.fetchLikedRestaurantIds(for: currentUser.id)
 
             reviews = try await reviewsTask
             isOnTastingList = try await tastingTask.contains { $0.restaurantId == rowId }
+            isLiked = try await likedTask.contains(rowId)
             errorMessage = nil
         } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
+    }
+
+    // Liking is the lightest way to say "I'd go here", and it's what feeds the
+    // group pick — so like the tasting list, it persists the place first.
+    private func toggleLike() async {
+        let wasLiked = isLiked
+        withAnimation { isLiked.toggle() }
+
+        do {
+            let rowId = try await persistedRowId()
+            try await dataService.setLiked(!wasLiked, restaurantId: rowId)
+            errorMessage = nil
+        } catch {
+            withAnimation { isLiked = wasLiked }
             errorMessage = DataLoadFailure.message(for: error)
         }
     }
@@ -221,6 +241,20 @@ struct RestaurantDetailView: View {
 
     private var actionButtonsSection: some View {
         HStack(spacing: AppTheme.spacingMD) {
+            // Like — icon only, so the two wordier actions keep their room.
+            Button {
+                Task { await toggleLike() }
+            } label: {
+                Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 52)
+                    .padding(.vertical, AppTheme.spacingMD)
+                    .background(isLiked ? Color.pink : AppTheme.tagBackground)
+                    .foregroundStyle(isLiked ? .white : AppTheme.textPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
+            }
+            .accessibilityLabel(isLiked ? "Unlike" : "Like")
+
             // Add to tasting list button
             Button {
                 Task { await toggleTastingList() }
@@ -231,6 +265,10 @@ struct RestaurantDetailView: View {
                 )
                 .font(.subheadline)
                 .fontWeight(.semibold)
+                // Three buttons in one row is tight on a small iPhone; shrink
+                // the text rather than truncating "On Tasting List".
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, AppTheme.spacingMD)
                 .background(isOnTastingList ? AppTheme.primaryColor : AppTheme.tagBackground)
@@ -245,6 +283,8 @@ struct RestaurantDetailView: View {
                 Label("Review", systemImage: "square.and.pencil")
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppTheme.spacingMD)
                     .background(AppTheme.primaryColor)
