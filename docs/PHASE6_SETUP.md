@@ -4,11 +4,12 @@ One migration, then build. No console work — Realtime is included in the free 
 
 ## Apply
 
-Supabase Dashboard → **SQL Editor** → paste and run:
+Supabase Dashboard → **SQL Editor** → paste and run **both**, in order:
 
-[`supabase/migrations/20260802000700_shared_lists_realtime.sql`](../supabase/migrations/20260802000700_shared_lists_realtime.sql)
+1. [`supabase/migrations/20260802000700_shared_lists_realtime.sql`](../supabase/migrations/20260802000700_shared_lists_realtime.sql) — adds `list_entries` to the `supabase_realtime` publication and sets its replica identity to FULL.
+2. [`supabase/migrations/20260802000800_fix_lists_select_policy.sql`](../supabase/migrations/20260802000800_fix_lists_select_policy.sql) — fixes a Phase 2 policy that made list creation fail. **Required**, or creating a list returns `42501 new row violates row-level security policy`.
 
-It adds `list_entries` to the `supabase_realtime` publication and sets its replica identity to FULL. The lists tables and policies have existed since Phase 2.
+The lists tables themselves have existed since Phase 2.
 
 Verify:
 
@@ -46,6 +47,8 @@ That's the whole point of this phase. If step 5 doesn't happen but a pull-to-ref
 **Changes trigger a refetch, not a patch.** A Realtime payload could be an insert, an update, or a delete. Refetching the list's entries handles all three identically and can't drift out of sync; a list holds a few dozen rows at most, so the query is cheap. Decoding three payload shapes to avoid one small query would be the wrong trade.
 
 **Replica identity FULL matters.** Without it a DELETE broadcast carries only the primary key, so a client can't tell which list the removed row belonged to and the server-side filter wouldn't match it.
+
+**An insert that asks for its row back needs a SELECT policy that passes immediately.** PostgREST sends `Prefer: return=representation`, so every insert is really `INSERT ... RETURNING`, and Postgres applies the SELECT policy to the returned row. The original `lists` SELECT policy was membership-only, but membership is granted by an AFTER INSERT trigger — which fires *after* RETURNING is evaluated. The owner wasn't yet a member of their own new list, so the insert was rejected. Migration `...000800` lets owners see their lists directly. Worth remembering when adding any table whose SELECT policy depends on a row a trigger creates.
 
 ## The tasting list stays separate
 
