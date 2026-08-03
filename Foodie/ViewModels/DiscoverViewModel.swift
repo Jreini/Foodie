@@ -33,6 +33,10 @@ class DiscoverViewModel {
         return cuisines.sorted()
     }
 
+    // Where the last search was centred, so the map can tell how far the user
+    // has panned and offer to search again.
+    private(set) var lastSearchCenter: CLLocationCoordinate2D?
+
     private let dataService: any DataServiceProtocol
     private let locationProvider = LocationProvider()
     private var searchTask: Task<Void, Never>?
@@ -43,7 +47,9 @@ class DiscoverViewModel {
 
     // MARK: - Loading
 
-    func loadNearby() async {
+    // Passing a coordinate searches there instead of at the user's location —
+    // that's what "Search this area" on the map does after a pan.
+    func loadNearby(at coordinate: CLLocationCoordinate2D? = nil) async {
         isLoading = true
         errorMessage = nil
         defer {
@@ -51,17 +57,23 @@ class DiscoverViewModel {
             hasLoadedOnce = true
         }
 
-        guard let location = await locationProvider.currentLocation() else {
+        let center: CLLocationCoordinate2D
+        if let coordinate {
+            center = coordinate
+        } else if let location = await locationProvider.currentLocation() {
+            center = location.coordinate
+        } else {
             await loadSavedPlaces()
             return
         }
 
         isShowingSavedPlacesOnly = false
+        lastSearchCenter = center
 
         do {
             let places = try await PlaceSearchService.searchRestaurants(
                 matching: searchText,
-                near: location.coordinate
+                near: center
             )
             allRestaurants = await mergingCrowdData(into: places)
             applyFilters()

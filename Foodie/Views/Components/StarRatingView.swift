@@ -18,6 +18,41 @@ struct StarRatingView: View {
     }
 }
 
+// Tappable star picker.
+//
+// Each star is its own button. The previous version put a single tap gesture
+// over the whole row and derived the rating from the touch's x position
+// divided by an assumed star width — which broke inside a Form, where the row
+// is far wider than the stars themselves. The leading offset pushed every tap
+// past the fifth star, so any tap produced a 5.
+struct StarRatingInput: View {
+    @Binding var rating: Int
+    var maxRating: Int = 5
+    var starSize: CGFloat = 28
+    var color: Color = AppTheme.ratingColor
+
+    var body: some View {
+        HStack(spacing: AppTheme.spacingSM) {
+            ForEach(1...maxRating, id: \.self) { star in
+                Button {
+                    rating = star
+                } label: {
+                    Image(systemName: star <= rating ? "star.fill" : "star")
+                        .font(.system(size: starSize))
+                        .foregroundStyle(star <= rating ? color : Color.gray.opacity(0.3))
+                        // Padded hit area: the glyph alone is a small target,
+                        // and contentShape makes the gaps tappable too.
+                        .frame(width: starSize + 14, height: starSize + 14)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(star == 1 ? "1 star" : "\(star) stars")
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: rating)
+    }
+}
+
 // Displays a numeric rating with a single star icon (e.g. "4.5 ★")
 struct NumericRatingView: View {
     let rating: Double

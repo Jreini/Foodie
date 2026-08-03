@@ -34,7 +34,9 @@ struct DiscoverNewTasteView: View {
             if let restaurant = result {
                 discoveryResultView(restaurant)
             } else if hasSearched {
-                Text("No undiscovered spots found. You've tried everything!")
+                // Honest about both causes: you really have saved everything
+                // nearby, or we couldn't get a location to search around.
+                Text("Couldn't find somewhere new nearby. Check that location access is on, or try again from a different spot.")
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.textSecondary)
                     .multilineTextAlignment(.center)

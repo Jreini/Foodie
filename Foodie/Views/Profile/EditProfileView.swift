@@ -14,6 +14,10 @@ struct EditProfileView: View {
     @State private var isSaving = false
     @State private var saveError: String?
 
+    // Same reason as the review composer: Return inserts a newline in a
+    // TextEditor, so there's no built-in way to put the keyboard away.
+    @FocusState private var isBioFocused: Bool
+
     var body: some View {
         NavigationStack {
             Form {
@@ -46,6 +50,7 @@ struct EditProfileView: View {
                 Section("Bio") {
                     TextEditor(text: $bio)
                         .frame(minHeight: 80)
+                        .focused($isBioFocused)
                 }
 
                 if let saveError {
@@ -73,7 +78,13 @@ struct EditProfileView: View {
                         .fontWeight(.semibold)
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isBioFocused = false }
+                        .fontWeight(.semibold)
+                }
             }
+            .scrollDismissesKeyboard(.interactively)
             .onAppear {
                 name = profile.name ?? ""
                 bio = profile.bio
