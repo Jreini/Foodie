@@ -4,11 +4,10 @@ One migration, then build. No console work — the Storage bucket is created by 
 
 ## Apply
 
-Supabase Dashboard → **SQL Editor** → paste and run:
+Supabase Dashboard → **SQL Editor** → paste and run **both**, in order:
 
-[`supabase/migrations/20260802000900_photos_and_account_deletion.sql`](../supabase/migrations/20260802000900_photos_and_account_deletion.sql)
-
-It creates the `review-photos` bucket with per-user write policies, and adds `delete_current_user()`.
+1. [`supabase/migrations/20260802000900_photos_and_account_deletion.sql`](../supabase/migrations/20260802000900_photos_and_account_deletion.sql) — creates the `review-photos` bucket with per-user write policies, and adds `delete_current_user()`.
+2. [`supabase/migrations/20260802001000_fix_storage_path_case.sql`](../supabase/migrations/20260802001000_fix_storage_path_case.sql) — **required**, or every upload fails with `403 new row violates row-level security policy`. Swift renders UUIDs uppercase and Postgres renders them lowercase, so the folder-name comparison never matched.
 
 Verify:
 

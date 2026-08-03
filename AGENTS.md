@@ -66,7 +66,7 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 `PhotoUploadService` handles review photos in the `review-photos` bucket.
 
 - **Always downscale before upload** (1600px long edge, JPEG 0.8). Egress is the quota this app would outgrow first, and every view counts again — uploading originals would burn it fast.
-- **Paths must be `<user_id>/<uuid>.jpg`.** The bucket's INSERT policy checks the first path segment against `auth.uid()`, so the shape is load-bearing, not a convention.
+- **Paths must be `<user_id>/<uuid>.jpg`, lowercased.** The bucket's INSERT policy checks the first path segment against `auth.uid()`, so the shape is load-bearing. **Swift's `UUID.uuidString` is uppercase and Postgres's `uuid::text` is lowercase** — comparing them unmodified fails every time. Lowercase any UUID that crosses into a SQL string comparison.
 - The bucket is **public-read** so images load from the CDN without a signed-URL round trip. Writes are still per-user.
 - Upload photos *before* writing the review row — a row pointing at a failed upload renders as broken images permanently.
 

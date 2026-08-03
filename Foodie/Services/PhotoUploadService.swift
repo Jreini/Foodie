@@ -25,7 +25,11 @@ enum PhotoUploadService {
 
         // The first path segment must be the user's id — the bucket's INSERT
         // policy checks exactly that, so this shape is load-bearing.
-        let path = "\(userId.uuidString)/\(UUID().uuidString).jpg"
+        //
+        // Lowercased deliberately: Swift renders UUIDs uppercase while Postgres
+        // renders `auth.uid()::text` lowercase, so an unmodified uuidString
+        // never matches the policy and every upload 403s.
+        let path = "\(userId.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
 
         try await SupabaseService.client.storage
             .from(bucket)
