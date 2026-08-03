@@ -60,14 +60,41 @@ class DecisionEngineViewModel {
         isAnimatingPick = false
     }
 
-    // Roll the Dice for a group: mock-picks a random spot the group might overlap on
-    // For real data this would aggregate each friend's likes + tasting list
-    func pickForGroup(selectedFriendIds: [UUID]) -> Restaurant? {
+    // Roll the Dice for a group.
+    //
+    // The overlap is computed in Postgres (`group_pick_candidates`), which
+    // returns restaurants ranked by how many of the group saved or liked them.
+    // Doing it server-side is what makes it correct: the client can't see
+    // friends' full lists in one place, and RLS is what decides whose rows
+    // count — passing in someone who isn't a friend simply contributes nothing.
+    func pickForGroup(selectedFriendIds: [UUID]) async -> Restaurant? {
         guard !selectedFriendIds.isEmpty else { return nil }
 
-        // Include the user's own pool as the overlap seed
-        let pool = Array(Set(likedRestaurants + tastingListRestaurants))
-        return (pool.isEmpty ? allRestaurants : pool).randomElement()
+        do {
+            let ranked = try await dataService.groupPickCandidates(friendIds: selectedFriendIds)
+            let byId = Dictionary(
+                allRestaurants.map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+
+            // Ties are common with small groups, so pick randomly among the
+            // joint top scorers rather than always returning the same one.
+            let candidates = ranked.compactMap { byId[$0] }
+            guard !candidates.isEmpty else { return fallbackPick() }
+
+            let topTier = candidates.prefix(max(1, min(3, candidates.count)))
+            return topTier.randomElement()
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+            return fallbackPick()
+        }
+    }
+
+    // Nobody in the group has saved anything in common — better to suggest
+    // something than to show an empty result.
+    private func fallbackPick() -> Restaurant? {
+        let ownPool = Array(Set(likedRestaurants + tastingListRestaurants))
+        return (ownPool.isEmpty ? allRestaurants : ownPool).randomElement()
     }
 
     // Animated version of group pick used by Roll the Dice
@@ -75,8 +102,15 @@ class DecisionEngineViewModel {
         guard !selectedFriendIds.isEmpty else { return }
         isAnimatingPick = true
 
-        try? await Task.sleep(for: .milliseconds(600))
-        pickedRestaurant = pickForGroup(selectedFriendIds: selectedFriendIds)
+        // Run the spin and the query together so the animation isn't just
+        // added on top of however long the network takes.
+        async let spin: Void = Task.sleep(for: .milliseconds(600))
+        async let pick = pickForGroup(selectedFriendIds: selectedFriendIds)
+
+        let result = await pick
+        try? await spin
+
+        pickedRestaurant = result
         isAnimatingPick = false
     }
 

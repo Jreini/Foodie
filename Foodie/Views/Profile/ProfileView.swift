@@ -104,10 +104,18 @@ struct ProfileView: View {
                     .padding(.horizontal, AppTheme.spacingXXL)
             }
 
-            // Stats row
+            // Stats row. Friends is the only one that leads somewhere, since
+            // it's where requests are answered.
             HStack(spacing: AppTheme.spacingXXL) {
                 profileStat(count: viewModel.reviewCount, label: "Reviews")
-                profileStat(count: viewModel.friendCount, label: "Friends")
+
+                NavigationLink {
+                    FriendsView()
+                } label: {
+                    profileStat(count: viewModel.friendCount, label: "Friends")
+                }
+                .buttonStyle(.plain)
+
                 profileStat(count: viewModel.tastingListCount, label: "Tasting List")
             }
             .padding(.top, AppTheme.spacingSM)

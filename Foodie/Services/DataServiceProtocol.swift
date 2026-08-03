@@ -17,6 +17,27 @@ protocol DataServiceProtocol {
     func fetchAllUsers() async throws -> [User]
     func fetchFriends(for userId: UUID) async throws -> [User]
 
+    // MARK: - Friendships
+
+    // Username prefix/substring search. Excludes nobody — filtering out people
+    // you're already connected to is the UI's job, since it wants to show them
+    // with a different button rather than hide them.
+    func searchUsers(username: String) async throws -> [User]
+
+    // Every edge the signed-in user is part of, in any state. RLS returns only
+    // those, so one call covers friends, incoming, and outgoing requests.
+    func fetchFriendships() async throws -> [Friendship]
+
+    func sendFriendRequest(to userId: UUID) async throws
+    func acceptFriendRequest(friendshipId: UUID) async throws
+    // Declining and unfriending are both "remove the edge" — the difference is
+    // only which state it was in.
+    func removeFriendship(friendshipId: UUID) async throws
+
+    // Restaurants the caller and the given friends are collectively interested
+    // in, most-shared first. Computed server-side.
+    func groupPickCandidates(friendIds: [UUID]) async throws -> [UUID]
+
     // MARK: - Restaurants
 
     func fetchAllRestaurants() async throws -> [Restaurant]
@@ -44,7 +65,8 @@ protocol DataServiceProtocol {
 
     // MARK: - Feed
 
-    func fetchActivityFeed(for userId: UUID) async throws -> [FriendActivity]
+    // `before` pages backwards through time; nil starts at the newest.
+    func fetchActivityFeed(for userId: UUID, before: Date?) async throws -> [FriendActivity]
 
     // MARK: - Writes
 

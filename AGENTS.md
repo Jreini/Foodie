@@ -12,7 +12,8 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Phase 2 complete:** full Postgres schema, RLS on every table, triggers, username onboarding, real profile data. See `docs/PHASE2_SETUP.md`.
 - **Phase 3 complete:** `DataServiceProtocol` is `async throws`, `SupabaseDataService` backs it, and every view model has loading/error/empty states. See `docs/PHASE3_SETUP.md`.
 - **Phase 4 complete:** restaurants come from MapKit search near the user, merged with whatever crowd data exists; the Map tab is real. See `docs/PHASE4_SETUP.md`.
-- **Next up: Phase 5** — friend requests and a real feed. The `friendships` table and policies already exist; nothing writes to them yet.
+- **Phase 5 complete:** friend search/request/accept, a feed that paginates, and a real group pick. See `docs/PHASE5_SETUP.md`. **Testing friends needs two accounts** — sign in with Apple on one device and Google on another.
+- **Next up: Phase 6** — shared lists with Realtime. Tables and policies exist from Phase 2.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -64,6 +65,7 @@ Schema lives in `supabase/migrations/`, applied in filename order. Ten tables; s
 - **RLS is the only security boundary.** The publishable key ships in the app, so a missing or wrong policy *is* a data leak. Every policy is scoped `to authenticated` and wraps `auth.uid()` as `(select auth.uid())` so the planner evaluates it once per query rather than once per row.
 - **Absent policies are deliberate.** `restaurants` has no UPDATE policy and `activities` has no INSERT policy — only `SECURITY DEFINER` triggers should write there. Adding a client-facing policy to either would let anyone forge ratings or fake a friend's activity.
 - **`is_friend()` / `is_list_member()` / `is_list_owner()` are `SECURITY DEFINER` on purpose.** They bypass RLS to break policy recursion (a `list_members` policy querying `list_members` would loop forever). All set `search_path = ''`; keep it that way.
+- **`group_pick_candidates()` is `SECURITY INVOKER`, also on purpose** — the opposite call. It runs as the caller *so that* RLS applies: the `likes`/`tasting_list` policies already limit rows to the caller and their accepted friends, so a stranger's id contributes nothing. Making it DEFINER would turn it into a way to read anyone's saved restaurants.
 - Server-side logic is all in Postgres — profile creation on signup, restaurant aggregate recompute, and activity feed rows are triggers, not app code. There is no application server.
 - Tiers are `double precision` on [0,1], never enums.
 
