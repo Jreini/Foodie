@@ -579,12 +579,26 @@ struct SupabaseDataService: DataServiceProtocol {
         }
     }
 
+    func deleteAccount() async throws {
+        // A SECURITY DEFINER function rather than an Edge Function: it takes no
+        // arguments and can only delete the caller's own row, so there's
+        // nothing to tamper with and no secret key in play.
+        try await client
+            .rpc("delete_current_user")
+            .execute()
+
+        // The session is now backed by a user that no longer exists; clearing
+        // it locally is what returns the UI to the login screen.
+        try? await client.auth.signOut()
+    }
+
     @discardableResult
     func submitReview(
         restaurantId: UUID,
         rating: Int,
         text: String,
         moodTags: [String],
+        photoPaths: [String],
         tierPlacement: RestaurantTier
     ) async throws -> Review {
         let userId = try currentUserId()
@@ -601,6 +615,7 @@ struct SupabaseDataService: DataServiceProtocol {
                     rating: rating,
                     body: text,
                     moodTags: moodTags,
+                    photoPaths: photoPaths,
                     tierPlacement: tierPlacement.value
                 ),
                 onConflict: "user_id,restaurant_id"
@@ -1071,6 +1086,7 @@ private struct ReviewInsert: Encodable {
     let rating: Int
     let body: String
     let moodTags: [String]
+    let photoPaths: [String]
     let tierPlacement: Double
 
     enum CodingKeys: String, CodingKey {
@@ -1078,6 +1094,7 @@ private struct ReviewInsert: Encodable {
         case userId = "user_id"
         case restaurantId = "restaurant_id"
         case moodTags = "mood_tags"
+        case photoPaths = "photo_paths"
         case tierPlacement = "tier_placement"
     }
 }

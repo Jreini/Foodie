@@ -107,8 +107,15 @@ protocol DataServiceProtocol {
         rating: Int,
         text: String,
         moodTags: [String],
+        photoPaths: [String],
         tierPlacement: RestaurantTier
     ) async throws -> Review
+
+    // MARK: - Account
+
+    // Removes the account and everything owned by it. Irreversible, and
+    // required by the App Store for any app that offers sign-in.
+    func deleteAccount() async throws
 }
 
 // Resolves which implementation the app uses.
