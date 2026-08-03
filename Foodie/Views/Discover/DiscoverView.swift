@@ -24,9 +24,28 @@ struct DiscoverView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
-            .onAppear {
-                viewModel.loadRestaurants()
+            .refreshable { await viewModel.loadRestaurants() }
+            .overlay { statusOverlay }
+            .task { await viewModel.loadRestaurants() }
+        }
+    }
+
+    @ViewBuilder
+    private var statusOverlay: some View {
+        if viewModel.isLoading && viewModel.allRestaurants.isEmpty {
+            ProgressView()
+        } else if let message = viewModel.errorMessage {
+            ContentUnavailableView {
+                Label("Couldn't load restaurants", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button("Try Again") {
+                    Task { await viewModel.loadRestaurants() }
+                }
             }
+        } else if !viewModel.searchText.isEmpty && viewModel.filteredRestaurants.isEmpty {
+            ContentUnavailableView.search(text: viewModel.searchText)
         }
     }
 

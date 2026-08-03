@@ -107,6 +107,10 @@ Keep every migration as SQL files in `supabase/migrations/` in this repo (use th
 4. Add write methods to the protocol as features need them (`submitReview`, `toggleLike`, `addToTastingList`, …) — mirror reads.
 5. **Snappy rule:** render cached data instantly, refresh in background, update optimistically on writes (toggle the like locally, then sync; roll back on failure). A lightweight in-memory cache per view model is enough to start — don't build a sync engine yet.
 
+> **Phase 3 shipped.** Protocol is `async throws`; `SupabaseDataService` implements every read plus four writes (tasting list add/remove, like, review). View models are `@MainActor @Observable` with loading/error/empty states; views use `.task` and `.refreshable`. Optimistic writes with rollback on the tasting-list toggle. See `docs/PHASE3_SETUP.md`.
+>
+> One addition to the plan: a seed migration inserts eight starter restaurants. Without it the `restaurants` table is empty until Phase 4 and Discover is a blank screen, which would have made Phase 3 impossible to test on its own. Phase 4 makes the seed redundant.
+
 ## Phase 4 — Real restaurants via MapKit (2–3 days)
 
 1. Discover tab: `MKLocalSearch` (natural-language + category filters, `pointOfInterestFilter` = restaurants) around the user's location. Results are `MKMapItem`s → map into the existing `Restaurant` struct.

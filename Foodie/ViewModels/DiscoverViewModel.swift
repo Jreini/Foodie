@@ -2,9 +2,14 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class DiscoverViewModel {
     var allRestaurants: [Restaurant] = []
     var filteredRestaurants: [Restaurant] = []
+    var isLoading = false
+    var errorMessage: String?
+    var hasLoadedOnce = false
+
     var searchText: String = "" {
         didSet { applyFilters() }
     }
@@ -13,27 +18,30 @@ class DiscoverViewModel {
     }
 
     var cuisineCategories: [String] {
-        let cuisines = Set(allRestaurants.map { $0.cuisineType })
+        let cuisines = Set(allRestaurants.map { $0.cuisineType }).filter { !$0.isEmpty }
         return cuisines.sorted()
     }
 
-    private let dataService: DataServiceProtocol
+    private let dataService: any DataServiceProtocol
 
-    init(dataService: DataServiceProtocol = MockDataService()) {
+    init(dataService: any DataServiceProtocol = DataServices.current) {
         self.dataService = dataService
     }
 
-    func loadRestaurants() {
-        allRestaurants = dataService.fetchAllRestaurants()
-        applyFilters()
-    }
+    func loadRestaurants() async {
+        isLoading = true
+        errorMessage = nil
+        defer {
+            isLoading = false
+            hasLoadedOnce = true
+        }
 
-    func fetchReviews(for restaurantId: UUID) -> [Review] {
-        dataService.fetchReviews(for: restaurantId)
-    }
-
-    func findUser(by userId: UUID) -> User? {
-        dataService.fetchAllUsers().first(where: { $0.id == userId })
+        do {
+            allRestaurants = try await dataService.fetchAllRestaurants()
+            applyFilters()
+        } catch {
+            errorMessage = DataLoadFailure.message(for: error)
+        }
     }
 
     private func applyFilters() {

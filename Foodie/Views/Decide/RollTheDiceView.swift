@@ -75,7 +75,7 @@ struct RollTheDiceView: View {
         .background(AppTheme.screenBackground)
         .navigationTitle("Roll the Dice")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { viewModel.loadData() }
+        .task { await viewModel.loadData() }
     }
 
     // MARK: - Subviews
@@ -185,11 +185,13 @@ struct RollTheDiceView: View {
 
     // Dispatches the correct roll animation based on current mode
     private func performRoll() {
-        switch selectedMode {
-        case .solo:
-            viewModel.pickRandomForMe()
-        case .group:
-            viewModel.rollForGroup(selectedFriendIds: Array(selectedFriendIds))
+        Task {
+            switch selectedMode {
+            case .solo:
+                await viewModel.pickRandomForMe()
+            case .group:
+                await viewModel.rollForGroup(selectedFriendIds: Array(selectedFriendIds))
+            }
         }
     }
 
