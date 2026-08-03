@@ -16,6 +16,11 @@ class FeedViewModel {
     // False once a page comes back short, so the list stops asking.
     private(set) var hasMore = true
 
+    // Badges the Friends button so a waiting request doesn't sit unanswered on
+    // a screen nobody opens. One small query — the friendships policy already
+    // limits it to the caller's own edges.
+    private(set) var pendingRequestCount = 0
+
     private let dataService: any DataServiceProtocol
     private var currentUserId: UUID?
 
@@ -38,9 +43,18 @@ class FeedViewModel {
             let page = try await dataService.fetchActivityFeed(for: currentUser.id, before: nil)
             activities = page
             hasMore = !page.isEmpty
+
+            await loadPendingRequestCount(for: currentUser.id)
         } catch {
             errorMessage = DataLoadFailure.message(for: error)
         }
+    }
+
+    // Deliberately swallows its error: a badge that can't be counted is worth
+    // nothing, and failing the whole feed over it would be absurd.
+    private func loadPendingRequestCount(for userId: UUID) async {
+        guard let friendships = try? await dataService.fetchFriendships() else { return }
+        pendingRequestCount = friendships.filter { $0.isIncomingRequest(for: userId) }.count
     }
 
     // Pages backwards from the oldest row on screen. Keyset rather than offset,

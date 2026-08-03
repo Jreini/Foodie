@@ -328,12 +328,19 @@ private struct ReviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
             HStack {
-                // Reviewer info
+                // Reviewer info, linked to their profile — a review is the most
+                // common place you meet someone you haven't added yet.
                 if let reviewer {
-                    ProfileImageView(systemName: reviewer.profileImageName, size: 28)
-                    Text(reviewer.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                    NavigationLink(value: reviewer) {
+                        HStack(spacing: AppTheme.spacingSM) {
+                            ProfileImageView(user: reviewer, size: 28)
+                            Text(reviewer.name)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(AppTheme.textPrimary)
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
                 Spacer()
                 // Tier badge + stars together show the rating in context

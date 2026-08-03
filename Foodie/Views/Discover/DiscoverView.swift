@@ -24,6 +24,7 @@ struct DiscoverView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
+            .personProfileDestination()
             .refreshable { await viewModel.loadNearby() }
             .overlay { statusOverlay }
             .task { await viewModel.loadNearby() }

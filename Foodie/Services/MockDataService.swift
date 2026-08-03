@@ -25,7 +25,7 @@ class MockDataService: DataServiceProtocol {
             id: Self.currentUserId,
             name: "Justin Reini",
             username: "justineats",
-            profileImageName: "person.circle.fill",
+            avatarPath: nil,
             bio: "Always hunting for the best tacos in town.",
             joinDate: date(2025, 1, 15),
             friendIds: [Self.friend1Id, Self.friend2Id, Self.friend3Id]
@@ -34,7 +34,7 @@ class MockDataService: DataServiceProtocol {
             id: Self.friend1Id,
             name: "Mia Chen",
             username: "miabites",
-            profileImageName: "person.circle.fill",
+            avatarPath: nil,
             bio: "Sushi snob & coffee addict.",
             joinDate: date(2025, 2, 3),
             friendIds: [Self.currentUserId, Self.friend2Id]
@@ -43,7 +43,7 @@ class MockDataService: DataServiceProtocol {
             id: Self.friend2Id,
             name: "Alex Rivera",
             username: "alexfoodie",
-            profileImageName: "person.circle.fill",
+            avatarPath: nil,
             bio: "Will drive 2 hours for good BBQ.",
             joinDate: date(2025, 3, 20),
             friendIds: [Self.currentUserId, Self.friend1Id, Self.friend3Id]
@@ -52,7 +52,7 @@ class MockDataService: DataServiceProtocol {
             id: Self.friend3Id,
             name: "Sam Patel",
             username: "samcooks",
-            profileImageName: "person.circle.fill",
+            avatarPath: nil,
             bio: "Home cook by day, restaurant explorer by night.",
             joinDate: date(2025, 4, 10),
             friendIds: [Self.currentUserId, Self.friend2Id]
@@ -365,6 +365,12 @@ class MockDataService: DataServiceProtocol {
     func fetchFriends(for userId: UUID) async throws -> [User] {
         guard let user = users.first(where: { $0.id == userId }) else { return [] }
         return users.filter { user.friendIds.contains($0.id) }
+    }
+
+    // The mock carries everyone's friend ids, so no server-side helper is
+    // needed to stand in for the one RLS makes necessary live.
+    func friendCount(for userId: UUID) async throws -> Int {
+        users.first(where: { $0.id == userId })?.friendIds.count ?? 0
     }
 
     // MARK: - Friendships

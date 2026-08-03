@@ -24,10 +24,9 @@ struct ProfileView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        // The header names the signed-in account. Until the
-                        // profiles table lands in Phase 2 the rest of this
-                        // screen is still mock data, so this is the only place
-                        // that reflects who is actually logged in.
+                        // Titled with the account, so the two irreversible
+                        // actions underneath are unmistakably about *this*
+                        // sign-in and not the profile being viewed.
                         Section(accountLabel) {
                             Button(role: .destructive) {
                                 showSignOutConfirmation = true
@@ -99,6 +98,8 @@ struct ProfileView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
+            .personProfileDestination()
+            .friendsListDestination()
             .refreshable { await viewModel.loadProfile() }
             .task { await viewModel.loadProfile() }
         }
@@ -128,18 +129,13 @@ struct ProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: AppTheme.spacingMD) {
-            // Profile image
-            ProfileImageView(
-                systemName: viewModel.currentUser?.profileImageName ?? "person.circle.fill",
-                size: 80
-            )
+            ProfileImageView(avatarPath: auth.profile?.avatarPath, size: 80)
 
-            // Name and username come from the real profile row. The stats below
-            // are still mock — they move to Supabase in Phase 3.
             VStack(spacing: AppTheme.spacingXS) {
                 Text(auth.profile?.displayName ?? "")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
 
                 Text(auth.profile?.usernameHandle ?? "")
                     .font(.subheadline)
@@ -155,39 +151,36 @@ struct ProfileView: View {
                     .padding(.horizontal, AppTheme.spacingXXL)
             }
 
-            // Stats row. Friends is the only one that leads somewhere, since
-            // it's where requests are answered.
-            HStack(spacing: AppTheme.spacingXXL) {
-                profileStat(count: viewModel.reviewCount, label: "Reviews")
-
-                NavigationLink {
-                    FriendsView()
-                } label: {
-                    profileStat(count: viewModel.friendCount, label: "Friends")
-                }
-                .buttonStyle(.plain)
-
-                profileStat(count: viewModel.tastingListCount, label: "Tasting List")
-            }
-            .padding(.top, AppTheme.spacingSM)
+            statsRow
         }
+        .frame(maxWidth: .infinity)
         .padding(.top, AppTheme.spacingMD)
     }
 
-    private func profileStat(count: Int, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text("\(count)")
-                .font(.headline)
-                .fontWeight(.bold)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(AppTheme.textSecondary)
+    // Three equal columns rather than three self-sized ones. Sized to their own
+    // labels, "Tasting List" is half again as wide as "Reviews", which drags
+    // the numbers off-centre even though the row is centred as a whole — which
+    // is exactly what looked crooked.
+    private var statsRow: some View {
+        HStack(spacing: 0) {
+            ProfileStat(count: viewModel.reviewCount, label: "Reviews")
+
+            // Friends is the only stat that leads somewhere, since it's where
+            // requests are answered.
+            NavigationLink(value: FriendsRoute()) {
+                ProfileStat(count: viewModel.friendCount, label: "Friends")
+            }
+            .buttonStyle(.plain)
+
+            ProfileStat(count: viewModel.tastingListCount, label: "Tasting List")
         }
+        .padding(.horizontal, AppTheme.spacingXL)
+        .padding(.top, AppTheme.spacingSM)
     }
 
     private var segmentedPicker: some View {
         Picker("Section", selection: $viewModel.selectedSegment) {
-            ForEach(ProfileViewModel.ProfileSegment.allCases, id: \.self) { segment in
+            ForEach(ProfileSegment.allCases, id: \.self) { segment in
                 Text(segment.rawValue).tag(segment)
             }
         }
@@ -210,12 +203,12 @@ struct ProfileView: View {
     private var reviewsList: some View {
         LazyVStack(spacing: AppTheme.spacingMD) {
             if viewModel.userReviews.isEmpty {
-                emptySegmentView(icon: "square.and.pencil", message: "No reviews yet")
+                ProfileSegmentPlaceholder(icon: "square.and.pencil", message: "No reviews yet")
             } else {
                 ForEach(viewModel.userReviews) { review in
                     if let restaurant = viewModel.restaurantForReview(review) {
                         NavigationLink(value: restaurant) {
-                            userReviewCard(review: review, restaurant: restaurant)
+                            ProfileReviewCard(review: review, restaurant: restaurant)
                         }
                         .buttonStyle(.plain)
                     }
@@ -225,36 +218,10 @@ struct ProfileView: View {
         .padding(.horizontal, AppTheme.spacingLG)
     }
 
-    private func userReviewCard(review: Review, restaurant: Restaurant) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
-            HStack {
-                Text(restaurant.name)
-                    .font(.headline)
-                Spacer()
-                StarRatingView(rating: review.clampedRating, starSize: 12)
-            }
-
-            Text(review.text)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.textPrimary)
-                .lineLimit(2)
-
-            if !review.moodTags.isEmpty {
-                MoodTagRow(tags: review.moodTags)
-            }
-
-            Text(review.createdAt, style: .relative)
-                .font(.caption2)
-                .foregroundStyle(AppTheme.textSecondary)
-        }
-        .padding(AppTheme.spacingLG)
-        .cardStyle()
-    }
-
     private var likedList: some View {
         LazyVStack(spacing: AppTheme.spacingSM) {
             if viewModel.likedRestaurants.isEmpty {
-                emptySegmentView(icon: "heart", message: "No liked restaurants")
+                ProfileSegmentPlaceholder(icon: "heart", message: "No liked restaurants")
             } else {
                 ForEach(viewModel.likedRestaurants) { restaurant in
                     NavigationLink(value: restaurant) {
@@ -270,7 +237,7 @@ struct ProfileView: View {
     private var tastingList: some View {
         LazyVStack(spacing: AppTheme.spacingSM) {
             if viewModel.tastingListRestaurants.isEmpty {
-                emptySegmentView(icon: "bookmark", message: "Tasting list is empty")
+                ProfileSegmentPlaceholder(icon: "bookmark", message: "Tasting list is empty")
             } else {
                 ForEach(viewModel.tastingListRestaurants) { restaurant in
                     NavigationLink(value: restaurant) {
@@ -283,18 +250,6 @@ struct ProfileView: View {
         }
     }
 
-    private func emptySegmentView(icon: String, message: String) -> some View {
-        VStack(spacing: AppTheme.spacingSM) {
-            Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundStyle(AppTheme.primaryColor.opacity(0.4))
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, AppTheme.spacingXXL)
-    }
 }
 
 #Preview {

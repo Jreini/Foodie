@@ -12,13 +12,15 @@ struct Profile: Identifiable, Hashable, Codable {
     var username: String?
     var name: String?
     var bio: String
-    var avatarURL: String?
+    // Object path in the public `avatars` bucket — not a URL, despite what the
+    // column used to be called. See migration 20260803000100.
+    var avatarPath: String?
     var createdAt: Date
 
     // Column names are snake_case; the SDK's decoder does no key conversion.
     enum CodingKeys: String, CodingKey {
         case id, username, name, bio
-        case avatarURL = "avatar_url"
+        case avatarPath = "avatar_path"
         case createdAt = "created_at"
     }
 

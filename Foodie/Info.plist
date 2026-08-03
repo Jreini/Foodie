@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Foodie uses your location to find restaurants near you. It never leaves your device — searches run through Apple Maps.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Foodie uses the camera so you can take a profile picture. Nothing is captured unless you tap the shutter.</string>
 	<key>GIDClientID</key>
 	<string>101599172954-t3tr26feph6arc5mguompnu3a8oief2s.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

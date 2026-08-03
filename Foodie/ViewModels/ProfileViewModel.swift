@@ -1,6 +1,14 @@
 import Foundation
 import Observation
 
+// Shared with `UserProfileViewModel` so your profile and a friend's offer the
+// same three sections in the same order.
+enum ProfileSegment: String, CaseIterable {
+    case reviews = "Reviews"
+    case liked = "Liked"
+    case tastingList = "Tasting List"
+}
+
 @Observable
 @MainActor
 class ProfileViewModel {
@@ -15,12 +23,6 @@ class ProfileViewModel {
 
     // Tracks which segment is selected in the profile
     var selectedSegment: ProfileSegment = .reviews
-
-    enum ProfileSegment: String, CaseIterable {
-        case reviews = "Reviews"
-        case liked = "Liked"
-        case tastingList = "Tasting List"
-    }
 
     var reviewCount: Int { userReviews.count }
     var friendCount: Int { currentUser?.friendCount ?? 0 }

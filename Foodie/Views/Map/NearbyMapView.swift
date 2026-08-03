@@ -51,6 +51,7 @@ struct NearbyMapView: View {
             .navigationDestination(for: Restaurant.self) { restaurant in
                 RestaurantDetailView(restaurant: restaurant)
             }
+            .personProfileDestination()
             .task { await viewModel.loadNearby() }
         }
     }

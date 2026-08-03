@@ -216,7 +216,7 @@ private struct FriendSelectionChip: View {
         Button(action: onTap) {
             VStack(spacing: AppTheme.spacingXS) {
                 ZStack {
-                    ProfileImageView(systemName: user.profileImageName, size: 50)
+                    ProfileImageView(user: user, size: 50)
                         .opacity(isSelected ? 1.0 : 0.5)
 
                     if isSelected {

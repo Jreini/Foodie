@@ -150,6 +150,18 @@ final class AuthManager {
         state = .ready(user, profile)
     }
 
+    // Points the profile at a freshly uploaded avatar, or clears it with nil.
+    // Returns the path that was replaced so the caller can delete the old file —
+    // storage doesn't cascade, and nothing else knows the previous path once
+    // this returns.
+    @discardableResult
+    func updateAvatar(path: String?) async throws -> String? {
+        guard case .ready(let user, let existing) = state else { return nil }
+        let profile = try await ProfileService.updateAvatar(id: user.id, path: path)
+        state = .ready(user, profile)
+        return existing.avatarPath
+    }
+
     func retryProfileLoad() async {
         guard case .profileUnavailable(let user) = state else { return }
         state = .loading

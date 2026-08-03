@@ -102,7 +102,7 @@ struct DiscoverNewTasteView: View {
         } label: {
             VStack(spacing: AppTheme.spacingXS) {
                 ZStack {
-                    ProfileImageView(systemName: friend.profileImageName, size: 50)
+                    ProfileImageView(user: friend, size: 50)
                         .opacity(isSelected ? 1.0 : 0.5)
 
                     if isSelected {
