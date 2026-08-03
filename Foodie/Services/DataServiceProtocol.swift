@@ -22,6 +22,16 @@ protocol DataServiceProtocol {
     func fetchAllRestaurants() async throws -> [Restaurant]
     func fetchRestaurant(by id: UUID) async throws -> Restaurant?
 
+    // Looks up the rows behind a set of MapKit results, so search results can
+    // be shown with whatever crowd data the community has built up.
+    func fetchRestaurants(mapkitPlaceIds: [String]) async throws -> [Restaurant]
+
+    // Makes sure a place exists in the database, returning the canonical row.
+    // MapKit results are not persisted until someone interacts with them, so
+    // every write path calls this first.
+    @discardableResult
+    func ensureRestaurantPersisted(_ restaurant: Restaurant) async throws -> Restaurant
+
     // MARK: - Reviews
 
     func fetchReviews(for restaurantId: UUID) async throws -> [Review]

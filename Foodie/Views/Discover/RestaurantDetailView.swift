@@ -9,6 +9,10 @@ struct RestaurantDetailView: View {
     @State private var isOnTastingList = false
     @State private var errorMessage: String?
 
+    // The database row for this place, once we know there is one. A MapKit
+    // search result doesn't have one until somebody interacts with it.
+    @State private var persistedRow: Restaurant?
+
     private let dataService: any DataServiceProtocol = DataServices.current
 
     var body: some View {
@@ -29,6 +33,7 @@ struct RestaurantDetailView: View {
             WriteReviewSheet(
                 restaurant: restaurant,
                 existingReviewCount: reviews.count,
+                resolveRestaurantId: { try await persistedRowId() },
                 onPosted: { await load() }
             )
         }
@@ -45,20 +50,55 @@ struct RestaurantDetailView: View {
         }
     }
 
+    // Merely looking at a place doesn't create a row for it — that would fill
+    // the table with everywhere anyone ever scrolled past. So this resolves an
+    // existing row if there is one and otherwise shows an empty state.
+    private func existingRowId() async -> UUID? {
+        if let persistedRow { return persistedRow.id }
+        if restaurant.isPersisted { return restaurant.id }
+
+        guard let placeId = restaurant.mapkitPlaceId,
+              let row = try? await dataService.fetchRestaurants(mapkitPlaceIds: [placeId]).first
+        else { return nil }
+
+        persistedRow = row
+        return row.id
+    }
+
+    // Called before any write. This is the moment a MapKit result becomes a
+    // real row.
+    private func persistedRowId() async throws -> UUID {
+        if let existing = await existingRowId() { return existing }
+
+        let row = try await dataService.ensureRestaurantPersisted(restaurant)
+        persistedRow = row
+        return row.id
+    }
+
     private func load() async {
         do {
-            async let reviewsTask = dataService.fetchReviews(for: restaurant.id)
             async let usersTask = dataService.fetchAllUsers()
             async let currentUserTask = dataService.fetchCurrentUser()
 
-            reviews = try await reviewsTask
             reviewersById = Dictionary(
                 uniqueKeysWithValues: try await usersTask.map { ($0.id, $0) }
             )
-
             let currentUser = try await currentUserTask
-            let tastingList = try await dataService.fetchTastingList(for: currentUser.id)
-            isOnTastingList = tastingList.contains { $0.restaurantId == restaurant.id }
+
+            guard let rowId = await existingRowId() else {
+                // Nobody has interacted with this place yet, so there's nothing
+                // to load — not an error.
+                reviews = []
+                isOnTastingList = false
+                errorMessage = nil
+                return
+            }
+
+            async let reviewsTask = dataService.fetchReviews(for: rowId)
+            async let tastingTask = dataService.fetchTastingList(for: currentUser.id)
+
+            reviews = try await reviewsTask
+            isOnTastingList = try await tastingTask.contains { $0.restaurantId == rowId }
             errorMessage = nil
         } catch {
             errorMessage = DataLoadFailure.message(for: error)
@@ -73,10 +113,11 @@ struct RestaurantDetailView: View {
         withAnimation { isOnTastingList.toggle() }
 
         do {
+            let rowId = try await persistedRowId()
             if wasOnList {
-                try await dataService.removeFromTastingList(restaurantId: restaurant.id)
+                try await dataService.removeFromTastingList(restaurantId: rowId)
             } else {
-                try await dataService.addToTastingList(restaurantId: restaurant.id, notes: "")
+                try await dataService.addToTastingList(restaurantId: rowId, notes: "")
             }
             errorMessage = nil
         } catch {
@@ -123,14 +164,17 @@ struct RestaurantDetailView: View {
 
                 Spacer()
 
-                // Open/closed indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(restaurant.isOpenNow ? .green : .red)
-                        .frame(width: 8, height: 8)
-                    Text(restaurant.isOpenNow ? "Open Now" : "Closed")
-                        .font(.subheadline)
-                        .foregroundStyle(AppTheme.textSecondary)
+                // Open/closed indicator, shown only when hours are actually
+                // known. MapKit doesn't report them.
+                if let isOpenNow = restaurant.isOpenNow {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(isOpenNow ? .green : .red)
+                            .frame(width: 8, height: 8)
+                        Text(isOpenNow ? "Open Now" : "Closed")
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
                 }
             }
 
@@ -149,10 +193,12 @@ struct RestaurantDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.textSecondary)
 
-            // Hours
-            Label(restaurant.hoursDescription, systemImage: "clock")
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.textSecondary)
+            // Hours, when we have them
+            if let hours = restaurant.hoursDescription, !hours.isEmpty {
+                Label(hours, systemImage: "clock")
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.textSecondary)
+            }
         }
         .padding(AppTheme.spacingLG)
     }
@@ -279,6 +325,9 @@ private struct WriteReviewSheet: View {
     // Passed in rather than re-fetched, so the flagging check doesn't need a
     // network round trip from inside a button handler.
     let existingReviewCount: Int
+    // Creates the database row if this place is still only a MapKit result,
+    // and hands back the id to attach the review to.
+    let resolveRestaurantId: () async throws -> UUID
     let onPosted: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -297,10 +346,12 @@ private struct WriteReviewSheet: View {
     init(
         restaurant: Restaurant,
         existingReviewCount: Int,
+        resolveRestaurantId: @escaping () async throws -> UUID,
         onPosted: @escaping () async -> Void
     ) {
         self.restaurant = restaurant
         self.existingReviewCount = existingReviewCount
+        self.resolveRestaurantId = resolveRestaurantId
         self.onPosted = onPosted
         _tier = State(initialValue: restaurant.averageTier)
     }
@@ -403,8 +454,9 @@ private struct WriteReviewSheet: View {
         defer { isPosting = false }
 
         do {
+            let restaurantId = try await resolveRestaurantId()
             try await dataService.submitReview(
-                restaurantId: restaurant.id,
+                restaurantId: restaurantId,
                 rating: rating,
                 text: reviewText,
                 // Mood tags don't have an input control yet; the column and the

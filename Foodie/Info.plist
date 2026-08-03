@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Foodie uses your location to find restaurants near you. It never leaves your device — searches run through Apple Maps.</string>
 	<key>GIDClientID</key>
 	<string>101599172954-t3tr26feph6arc5mguompnu3a8oief2s.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

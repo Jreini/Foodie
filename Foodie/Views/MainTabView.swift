@@ -21,7 +21,7 @@ struct MainTabView: View {
                 }
                 .tag(Tab.discover)
 
-            MapPlaceholderView()
+            NearbyMapView()
                 .tabItem {
                     Label("Map", systemImage: "map.fill")
                 }

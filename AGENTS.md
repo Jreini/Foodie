@@ -11,7 +11,8 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Phase 1 complete:** `AuthManager` owns the session, `RootView` gates on it, `LoginView` runs both native sign-in flows.
 - **Phase 2 complete:** full Postgres schema, RLS on every table, triggers, username onboarding, real profile data. See `docs/PHASE2_SETUP.md`.
 - **Phase 3 complete:** `DataServiceProtocol` is `async throws`, `SupabaseDataService` backs it, and every view model has loading/error/empty states. See `docs/PHASE3_SETUP.md`.
-- **Next up: Phase 4** — MapKit restaurant search, replacing the seeded starter rows. See `docs/FULLSTACK_PLAN.md`.
+- **Phase 4 complete:** restaurants come from MapKit search near the user, merged with whatever crowd data exists; the Map tab is real. See `docs/PHASE4_SETUP.md`.
+- **Next up: Phase 5** — friend requests and a real feed. The `friendships` table and policies already exist; nothing writes to them yet.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -46,6 +47,15 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Apple returns the user's name only on the very first authorization**, so `AuthManager` writes it to Supabase user metadata immediately. Losing it means the user must revoke the app under Settings > Apple Account to get it back. Google returns it every time.
 - Google's redirect comes back through the app's URL scheme, so `FoodieApp` must keep `.onOpenURL { GIDSignIn.sharedInstance.handle($0) }`. Sign-in silently never completes without it.
 - Session persistence and token refresh are the SDK's job — don't hand-roll them.
+
+### Places (MapKit)
+
+`PlaceSearchService` wraps `MKLocalSearch`; `LocationProvider` is a one-shot `CLLocationManager` wrapper. Both are free with the developer account — no API key, no billing, no quota.
+
+- **MapKit reports no price, hours, photos, or ratings.** Those fields on `Restaurant` are optional and stay nil rather than being defaulted to plausible-looking values. Don't "fix" a nil price by defaulting it to `1` — the UI hides unknown fields on purpose.
+- **A place is persisted only when someone interacts with it** (review, like, tasting list). Browsing writes nothing, which is what keeps the table small. `ensureRestaurantPersisted` is the single entry point, and every write path calls it first.
+- **The database owns identity, not the client.** The upsert conflicts on `mapkit_place_id`, so concurrent taps on the same restaurant converge on one row. The client-side UUID is derived deterministically from the place id (`PlaceSearchService.derivedId`) purely so SwiftUI has a stable handle before a row exists.
+- `baselineTier` for a new place is a coarse guess from the POI category (MapKit has no fast-food category). That's what `baseline_tier` is for — the first real placement starts correcting it.
 
 ### Database
 

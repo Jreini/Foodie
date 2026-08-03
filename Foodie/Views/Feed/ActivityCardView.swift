@@ -47,12 +47,14 @@ struct ActivityCardView: View {
                             .font(.caption)
                             .foregroundStyle(AppTheme.textSecondary)
 
-                        Text("·")
-                            .foregroundStyle(AppTheme.textSecondary)
+                        if !activity.restaurant.priceLevelString.isEmpty {
+                            Text("·")
+                                .foregroundStyle(AppTheme.textSecondary)
 
-                        Text(activity.restaurant.priceLevelString)
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.textSecondary)
+                            Text(activity.restaurant.priceLevelString)
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
                     }
 
                     // Show star rating if this is a review activity

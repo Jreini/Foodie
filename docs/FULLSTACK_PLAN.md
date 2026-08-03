@@ -118,6 +118,10 @@ Keep every migration as SQL files in `supabase/migrations/` in this repo (use th
 3. Baseline tier heuristic on first insert (e.g. from MapKit category + price level), then crowd placements take over via the trigger.
 4. Map tab: replace `MapPlaceholderView` with a real `Map` showing search results + friends' rated places. This also makes "open in Maps" navigation free.
 
+> **Phase 4 shipped.** `PlaceSearchService` (MKLocalSearch) + `LocationProvider`; Discover searches nearby and merges crowd data over the results; `NearbyMapView` replaces the placeholder, pins tinted by tier zone. Persist-on-interaction via `ensureRestaurantPersisted`, upserting on `mapkit_place_id` so the database resolves duplicates.
+>
+> Consequence worth recording: MapKit supplies no price, hours, photos, or ratings, so `Restaurant.priceLevel`, `hoursDescription`, and `isOpenNow` became optional and the UI hides them when unknown. Migration `20260802000500` makes `is_open_now` nullable, since Phase 3's `not null default true` would have had every discovered place claim to be open forever.
+
 ## Phase 5 — Friends + feed (2–3 days)
 
 1. User search by username (`ilike` on profiles), send request, accept/decline (update `friendships.status`).
