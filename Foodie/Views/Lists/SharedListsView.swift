@@ -19,9 +19,9 @@ struct SharedListsView: View {
             }
 
             ForEach(viewModel.lists) { list in
-                NavigationLink {
-                    SharedListDetailView(list: list)
-                } label: {
+                // By value, like everything else in this stack — the detail
+                // screen is registered on the Decide root.
+                NavigationLink(value: list) {
                     listRow(list)
                 }
                 .swipeActions {
@@ -166,5 +166,8 @@ private struct CreateListSheet: View {
 #Preview {
     NavigationStack {
         SharedListsView()
+            .navigationDestination(for: SharedList.self) { list in
+                SharedListDetailView(list: list)
+            }
     }
 }

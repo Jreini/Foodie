@@ -223,6 +223,26 @@ struct FriendsView: View {
     }
 }
 
+// MARK: - Navigation
+
+// The route to this screen, as a value.
+//
+// It exists because `NavigationLink { FriendsView() }` doesn't survive in a
+// stack that also pushes values: SwiftUI re-activates a view-based link when
+// the path changes for any other reason, so opening a friend's profile from
+// here pushed the profile *and* then this screen back on top of it. Once every
+// push in a stack is a value, that can't happen.
+struct FriendsRoute: Hashable {}
+
+extension View {
+    // Apply at the root of any stack that links to the friends list.
+    func friendsListDestination() -> some View {
+        navigationDestination(for: FriendsRoute.self) { _ in
+            FriendsView()
+        }
+    }
+}
+
 #Preview {
     NavigationStack {
         FriendsView()

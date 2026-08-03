@@ -30,9 +30,7 @@ struct FeedView: View {
                 // requests are answered, and an unanswered one is why the feed
                 // is empty in the first place.
                 ToolbarItem(placement: .primaryAction) {
-                    NavigationLink {
-                        FriendsView()
-                    } label: {
+                    NavigationLink(value: FriendsRoute()) {
                         Image(systemName: "person.2.fill")
                             .overlay(alignment: .topTrailing) {
                                 // A dot rather than a count: the number doesn't
@@ -57,6 +55,7 @@ struct FeedView: View {
                 RestaurantDetailView(restaurant: restaurant)
             }
             .personProfileDestination()
+            .friendsListDestination()
             .refreshable { await viewModel.loadActivityFeed() }
             .overlay { statusOverlay }
             .task { await viewModel.loadActivityFeed() }
@@ -84,9 +83,7 @@ struct FeedView: View {
             } description: {
                 Text("Reviews and check-ins from you and your friends show up here.")
             } actions: {
-                NavigationLink {
-                    FriendsView()
-                } label: {
+                NavigationLink(value: FriendsRoute()) {
                     Text("Find Friends")
                 }
             }

@@ -1,5 +1,18 @@
 import SwiftUI
 
+// Where each card on this screen leads.
+//
+// The whole tab navigates by value, not just parts of it. A view-based
+// `NavigationLink` left anywhere in the chain re-activates itself when the path
+// changes underneath it, so opening a reviewer's profile from a restaurant down
+// here would push the card that started the journey back on top of it.
+enum DecideRoute: Hashable {
+    case rollTheDice
+    case discoverNewTaste
+    case tastingList
+    case sharedLists
+}
+
 struct DecisionEngineView: View {
     var body: some View {
         NavigationStack {
@@ -11,7 +24,7 @@ struct DecisionEngineView: View {
                         .padding(.top, AppTheme.spacingSM)
 
                     // Three consolidated decision option cards
-                    NavigationLink(destination: RollTheDiceView()) {
+                    NavigationLink(value: DecideRoute.rollTheDice) {
                         DecisionOptionCard(
                             title: "Roll the Dice",
                             subtitle: "Random pick for just you or the whole group",
@@ -21,7 +34,7 @@ struct DecisionEngineView: View {
                     }
                     .buttonStyle(.plain)
 
-                    NavigationLink(destination: DiscoverNewTasteView()) {
+                    NavigationLink(value: DecideRoute.discoverNewTaste) {
                         DecisionOptionCard(
                             title: "Discover a New Taste",
                             subtitle: "Somewhere new — solo or with a group",
@@ -31,7 +44,7 @@ struct DecisionEngineView: View {
                     }
                     .buttonStyle(.plain)
 
-                    NavigationLink(destination: TastingListView()) {
+                    NavigationLink(value: DecideRoute.tastingList) {
                         DecisionOptionCard(
                             title: "My Tasting List",
                             subtitle: "Browse, add, and pick from your saved spots",
@@ -41,7 +54,7 @@ struct DecisionEngineView: View {
                     }
                     .buttonStyle(.plain)
 
-                    NavigationLink(destination: SharedListsView()) {
+                    NavigationLink(value: DecideRoute.sharedLists) {
                         DecisionOptionCard(
                             title: "Shared Lists",
                             subtitle: "Build lists with friends, live",
@@ -56,9 +69,23 @@ struct DecisionEngineView: View {
             }
             .background(AppTheme.screenBackground)
             .navigationTitle("Decide")
-            // Registered here rather than deeper, because this is the root of
-            // the tab's stack and the reviewer links inside a restaurant detail
-            // screen need somewhere to land.
+            // Every destination this tab can reach, registered at the root —
+            // SwiftUI keeps one per type per stack, and the screens below push
+            // values without knowing what renders them.
+            .navigationDestination(for: DecideRoute.self) { route in
+                switch route {
+                case .rollTheDice:      RollTheDiceView()
+                case .discoverNewTaste: DiscoverNewTasteView()
+                case .tastingList:      TastingListView()
+                case .sharedLists:      SharedListsView()
+                }
+            }
+            .navigationDestination(for: SharedList.self) { list in
+                SharedListDetailView(list: list)
+            }
+            .navigationDestination(for: Restaurant.self) { restaurant in
+                RestaurantDetailView(restaurant: restaurant)
+            }
             .personProfileDestination()
         }
     }

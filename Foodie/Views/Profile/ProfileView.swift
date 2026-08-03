@@ -99,6 +99,7 @@ struct ProfileView: View {
                 RestaurantDetailView(restaurant: restaurant)
             }
             .personProfileDestination()
+            .friendsListDestination()
             .refreshable { await viewModel.loadProfile() }
             .task { await viewModel.loadProfile() }
         }
@@ -166,9 +167,7 @@ struct ProfileView: View {
 
             // Friends is the only stat that leads somewhere, since it's where
             // requests are answered.
-            NavigationLink {
-                FriendsView()
-            } label: {
+            NavigationLink(value: FriendsRoute()) {
                 ProfileStat(count: viewModel.friendCount, label: "Friends")
             }
             .buttonStyle(.plain)

@@ -87,9 +87,7 @@ struct SharedListDetailView: View {
     private func entryRow(_ entry: SharedListEntry) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.spacingXS) {
             if let restaurant = viewModel.restaurant(for: entry) {
-                NavigationLink {
-                    RestaurantDetailView(restaurant: restaurant)
-                } label: {
+                NavigationLink(value: restaurant) {
                     RestaurantRowView(restaurant: restaurant)
                 }
             } else {
@@ -275,5 +273,8 @@ private struct ListMembersSheet: View {
                 createdAt: Date()
             )
         )
+        .navigationDestination(for: Restaurant.self) { restaurant in
+            RestaurantDetailView(restaurant: restaurant)
+        }
     }
 }
