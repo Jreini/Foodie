@@ -254,6 +254,36 @@ class MockDataService: DataServiceProtocol {
 
     // MARK: - Liked restaurant IDs (restaurants the current user has positively rated)
 
+    // MARK: - Shared Lists
+
+    static let sampleListId = UUID(uuidString: "00000000-0000-0000-0002-000000000001")!
+
+    lazy var sharedLists: [SharedList] = [
+        SharedList(
+            id: Self.sampleListId,
+            ownerId: Self.currentUserId,
+            name: "Taco Tour",
+            emoji: "🌮",
+            createdAt: daysAgo(6)
+        )
+    ]
+
+    lazy var sharedListMembers: [SharedListMember] = [
+        SharedListMember(listId: Self.sampleListId, userId: Self.currentUserId, role: .owner),
+        SharedListMember(listId: Self.sampleListId, userId: Self.friend1Id, role: .member)
+    ]
+
+    lazy var sharedListEntries: [SharedListEntry] = [
+        SharedListEntry(
+            id: UUID(),
+            listId: Self.sampleListId,
+            restaurantId: Self.restaurant2Id,
+            addedBy: Self.friend1Id,
+            notes: "Their al pastor is the whole point.",
+            createdAt: daysAgo(3)
+        )
+    ]
+
     // Mirrors the mock users' friendIds so the friends screen has something to
     // show in previews: everyone is already an accepted friend.
     lazy var friendships: [Friendship] = [
@@ -382,6 +412,89 @@ class MockDataService: DataServiceProtocol {
 
     func removeFriendship(friendshipId: UUID) async throws {
         friendships.removeAll { $0.id == friendshipId }
+    }
+
+    // MARK: - Shared Lists
+
+    func fetchLists() async throws -> [SharedList] {
+        sharedLists
+    }
+
+    func createList(name: String, emoji: String?) async throws -> SharedList {
+        let list = SharedList(
+            id: UUID(),
+            ownerId: Self.currentUserId,
+            name: name,
+            emoji: emoji,
+            createdAt: Date()
+        )
+        sharedLists.insert(list, at: 0)
+        sharedListMembers.append(
+            SharedListMember(listId: list.id, userId: Self.currentUserId, role: .owner)
+        )
+        return list
+    }
+
+    func deleteList(id: UUID) async throws {
+        sharedLists.removeAll { $0.id == id }
+        sharedListEntries.removeAll { $0.listId == id }
+        sharedListMembers.removeAll { $0.listId == id }
+    }
+
+    func fetchListEntries(listId: UUID) async throws -> [SharedListEntry] {
+        sharedListEntries
+            .filter { $0.listId == listId }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    @discardableResult
+    func addListEntry(
+        listId: UUID,
+        restaurantId: UUID,
+        notes: String
+    ) async throws -> SharedListEntry {
+        if let existing = sharedListEntries.first(where: {
+            $0.listId == listId && $0.restaurantId == restaurantId
+        }) {
+            return existing
+        }
+
+        let entry = SharedListEntry(
+            id: UUID(),
+            listId: listId,
+            restaurantId: restaurantId,
+            addedBy: Self.currentUserId,
+            notes: notes,
+            createdAt: Date()
+        )
+        sharedListEntries.insert(entry, at: 0)
+        return entry
+    }
+
+    func removeListEntry(entryId: UUID) async throws {
+        sharedListEntries.removeAll { $0.id == entryId }
+    }
+
+    func fetchListMembers(listId: UUID) async throws -> [SharedListMember] {
+        sharedListMembers.filter { $0.listId == listId }
+    }
+
+    func addListMember(listId: UUID, userId: UUID) async throws {
+        guard !sharedListMembers.contains(where: {
+            $0.listId == listId && $0.userId == userId
+        }) else { return }
+        sharedListMembers.append(
+            SharedListMember(listId: listId, userId: userId, role: .member)
+        )
+    }
+
+    func removeListMember(listId: UUID, userId: UUID) async throws {
+        sharedListMembers.removeAll { $0.listId == listId && $0.userId == userId }
+    }
+
+    // Nothing changes underneath a preview, so this stream simply never fires.
+    func listEntriesChanged(listId: UUID) -> AsyncStream<Void> {
+        AsyncStream { _ in }
     }
 
     func groupPickCandidates(friendIds: [UUID]) async throws -> [UUID] {

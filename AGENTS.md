@@ -13,7 +13,8 @@ Foodie is a SwiftUI iPhone app that treats food as social media: discover restau
 - **Phase 3 complete:** `DataServiceProtocol` is `async throws`, `SupabaseDataService` backs it, and every view model has loading/error/empty states. See `docs/PHASE3_SETUP.md`.
 - **Phase 4 complete:** restaurants come from MapKit search near the user, merged with whatever crowd data exists; the Map tab is real. See `docs/PHASE4_SETUP.md`.
 - **Phase 5 complete:** friend search/request/accept, a feed that paginates, and a real group pick. See `docs/PHASE5_SETUP.md`. **Testing friends needs two accounts** — sign in with Apple on one device and Google on another.
-- **Next up: Phase 6** — shared lists with Realtime. Tables and policies exist from Phase 2.
+- **Phase 6 complete:** shared lists with live Realtime updates, under Decide → Shared Lists. See `docs/PHASE6_SETUP.md`. Also needs two accounts to see the live part.
+- **Next up: Phase 7** — review photos to Supabase Storage, account deletion (an App Store requirement), and empty states. Push notifications can be deferred past v1.
 - Core Data (`Persistence.swift`, `Foodie.xcdatamodeld`) is untouched Xcode template boilerplate with a single unused `Item` entity — it is *not* the real persistence layer. Don't build on it without a deliberate decision.
 - The Map tab is a placeholder (`MapPlaceholderView`).
 - The full-stack/backend plan lives in `docs/FULLSTACK_PLAN.md` — read it before doing any backend, auth, or data-layer work.
@@ -82,6 +83,8 @@ Views (SwiftUI)  →  ViewModels (@Observable)  →  DataServiceProtocol  →  M
 - `Foodie/Services/MockDataService.swift` — hard-coded sample data with stable UUIDs. **Keep it conforming.** Its `async throws` methods never actually suspend or throw; matching the signature is the whole point.
 - **Don't add client-side filters believing they're security.** `fetchActivityFeed` selects the whole table on purpose — RLS narrows it to the caller and their friends server-side.
 - View models are `@MainActor @Observable` with `isLoading` / `errorMessage`. Views load with `.task` (not `.onAppear`) and offer `.refreshable`. Writes are optimistic: flip local state, sync, roll back on failure.
+- **Realtime is used in exactly one place** — `listEntriesChanged(listId:)`, driving the open shared list. Everything else is happy with pull-to-refresh, and a socket per screen would be waste. It goes through the protocol (mock returns a stream that never fires) so previews need no connection.
+- **Realtime honours RLS**, so a non-member receives nothing at all. On any change the view model refetches rather than patching from the payload: one query handles insert/update/delete identically and can't drift.
 
 ### Directory map (`Foodie/`)
 
