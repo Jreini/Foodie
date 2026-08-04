@@ -2,6 +2,12 @@
 
 Foodie is a SwiftUI iPhone app that treats food as social media: discover restaurants, review them, keep a "Tasting List" of places to try, see what friends are eating, and let the app decide where to go. It is iPhone-only by product decision (no Android, no iPad investment).
 
+## Session start
+
+At the start of any task-oriented session — any interaction where you will use tools and produce deliverables — **invoke the `task-observer` skill before beginning work**, so opportunities to improve the skills themselves get captured while the work is happening rather than reconstructed afterwards. Its log lives outside the repo, at `~/.claude/projects/-Users-reini-Documents-GitHub-Foodie/skill-observations/log.md`.
+
+When loading any other skill, check that log for OPEN observations tagged to it and apply their insights to the current work, even if the skill file itself hasn't been updated yet.
+
 ## Current state (August 2026)
 
 - UI shell is built and on TestFlight (first build shipped).
