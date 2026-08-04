@@ -115,6 +115,23 @@ enum PhotoUploadService {
         try? SupabaseService.client.storage.from(bucket).getPublicURL(path: path)
     }
 
+    // MARK: - Editing
+
+    // A photo straight out of the library or the camera is routinely 12
+    // megapixels — a 48 MB bitmap to push around at 120 Hz while somebody drags
+    // it, which is what makes a crop gesture feel like it's lagging behind the
+    // finger. The cropper works on a copy bounded to roughly what a screen can
+    // show, and crops from that.
+    //
+    // Nothing visible is lost: an avatar is downscaled to 512px on upload
+    // anyway, so even a hard zoom into this copy has more detail than survives
+    // the trip. Returned unchanged when the photo is already small enough.
+    static let editingMaxDimension: CGFloat = 2048
+
+    static func editingCopy(of image: UIImage) -> UIImage {
+        downscaled(image, maxDimension: editingMaxDimension)
+    }
+
     // MARK: - Resizing
 
     private static func downscaledJPEG(

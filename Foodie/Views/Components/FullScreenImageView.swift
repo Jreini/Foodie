@@ -71,12 +71,21 @@ struct FullScreenImageView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            pager
+            content
                 .offset(y: dismissOffset)
-                // The photo shrinks and fades as it's dragged, so a drag that
-                // isn't far enough to dismiss still reads as "this closes".
+                // The photo shrinks as it's dragged, so a drag that isn't far
+                // enough to dismiss still reads as "this closes".
                 .scaleEffect(photoScale)
-                .opacity(photoOpacity)
+
+            // The other half of that: dimming toward the black behind, rather
+            // than fading the photo itself. `.opacity` on a view this size
+            // forces an offscreen buffer that is recomposited on every frame
+            // of the drag; a flat colour on top costs nothing and looks the
+            // same against a black background.
+            Color.black
+                .opacity(dragDimming)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
         }
         .overlay(alignment: .topTrailing) { closeButton }
         .overlay(alignment: .bottom) { pageIndicator }
@@ -91,6 +100,20 @@ struct FullScreenImageView: View {
     }
 
     // MARK: - Pages
+
+    // One photo gets no scroll view, and that is a fix rather than a saving.
+    // A UIScrollView holds onto touches before passing them to its content, so
+    // a pan that starts inside one begins late and reads as the image dragging
+    // behind the finger. Every avatar and most reviews take this path.
+    @ViewBuilder
+    private var content: some View {
+        if source.urls.count == 1, let url = source.urls.first {
+            ZoomablePage(url: url, isZoomed: $isZoomed)
+                .ignoresSafeArea()
+        } else {
+            pager
+        }
+    }
 
     private var pager: some View {
         ScrollView(.horizontal) {
@@ -159,10 +182,10 @@ struct FullScreenImageView: View {
 
     // Converted rather than left as arithmetic at the call site: `dragProgress`
     // is a CGFloat and `opacity` takes a Double, and with a literal in the
-    // middle the compiler can read `1 - dragProgress * 0.5` two ways and
+    // middle the compiler can read `Double(dragProgress) * 0.5` two ways and
     // refuses to pick.
-    private var photoOpacity: Double {
-        1 - Double(dragProgress) * 0.5
+    private var dragDimming: Double {
+        Double(dragProgress) * 0.5
     }
 
     private var chromeOpacity: Double {

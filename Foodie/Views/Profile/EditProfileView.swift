@@ -232,7 +232,11 @@ struct EditProfileView: View {
 
         if let data = try? await item.loadTransferable(type: Data.self),
            let image = UIImage(data: data) {
-            photoToCrop = CroppablePhoto(image: image)
+            // Bounded before it reaches the cropper: a full-resolution photo is
+            // a multi-megapixel bitmap to transform on every frame of a drag,
+            // and the crop is downscaled to 512px on upload regardless. Done
+            // here, behind "Preparing photo…", rather than during the gesture.
+            photoToCrop = CroppablePhoto(image: PhotoUploadService.editingCopy(of: image))
         } else {
             saveError = "That photo couldn't be opened. Try another."
         }
@@ -242,7 +246,7 @@ struct EditProfileView: View {
     private func presentCropperForCapture() {
         guard let capturedPhoto else { return }
         self.capturedPhoto = nil
-        photoToCrop = CroppablePhoto(image: capturedPhoto)
+        photoToCrop = CroppablePhoto(image: PhotoUploadService.editingCopy(of: capturedPhoto))
     }
 
     // MARK: - Saving

@@ -38,20 +38,24 @@ struct AvatarCropView: View {
     private let minOutputSide: CGFloat = 256
 
     var body: some View {
+        // The safe area is ignored out here rather than layer by layer, and
+        // that placement is load-bearing. Ignoring it inside meant the photo
+        // and the circle were centred on the screen while the gesture reported
+        // positions inside the safe area — and since the top inset is bigger
+        // than the bottom one, the centre the pinch was measured from sat about
+        // a dozen points below the centre it was drawn around. Zooming drifted.
+        // One container, one centre, everything agrees.
         GeometryReader { proxy in
             let diameter = cropDiameter(in: proxy.size)
 
             ZStack {
                 Color.black
-                    .ignoresSafeArea()
 
-                photo(diameter: diameter)
-                    .ignoresSafeArea()
+                photo(diameter: diameter, in: proxy.size)
 
                 dimming(diameter: diameter)
-                    .ignoresSafeArea()
 
-                controls(diameter: diameter)
+                controls(diameter: diameter, insets: proxy.safeAreaInsets)
             }
             // The whole screen drives the photo, not just the circle: dragging
             // the dimmed part is how you pull a face into frame.
@@ -60,6 +64,7 @@ struct AvatarCropView: View {
             .gesture(pan(diameter: diameter))
         }
         .background(Color.black)
+        .ignoresSafeArea()
         .environment(\.colorScheme, .dark)
         .statusBarHidden()
     }
@@ -87,15 +92,29 @@ struct AvatarCropView: View {
 
     // MARK: - Layers
 
-    private func photo(diameter: CGFloat) -> some View {
-        let size = displaySize(diameter: diameter, zoom: zoom)
+    // Laid out at the zoom the last gesture settled on, and transformed for
+    // whatever the current one is doing on top of that.
+    //
+    // Resizing the frame live instead would re-run layout and re-sample a
+    // multi-megapixel bitmap on every frame of a pinch, which is exactly the
+    // work that makes a gesture feel like it's dragging behind the finger. A
+    // `scaleEffect` is a transform the GPU applies to what's already there.
+    // Committing the frame at the end of the gesture is what keeps it sharp —
+    // the same bargain a UIScrollView makes when it zooms.
+    private func photo(diameter: CGFloat, in container: CGSize) -> some View {
+        let settled = displaySize(diameter: diameter, zoom: committedZoom)
         return Image(uiImage: image)
             .resizable()
-            // Sized rather than scaled: the crop maths reads this same number
-            // back, and a `scaleEffect` would leave the layout size saying
-            // something different from what's on screen.
-            .frame(width: size.width, height: size.height)
+            .frame(width: settled.width, height: settled.height)
+            .scaleEffect(zoom / committedZoom)
             .offset(offset)
+            // The photo is deliberately larger than the screen, and a ZStack
+            // sizes itself to its biggest child — so without this the stack grew
+            // with the photo and quietly re-centred everything else in it. That
+            // is what walked the crop circle away from the middle while zooming.
+            // Pinning this layer to the container makes the photo overflow
+            // visually, which it should, without moving anything.
+            .frame(width: container.width, height: container.height)
     }
 
     // Everything outside the circle, dimmed. The circle is punched out of the
@@ -103,17 +122,12 @@ struct AvatarCropView: View {
     // the pixels that will be kept.
     private func dimming(diameter: CGFloat) -> some View {
         ZStack {
-            Rectangle()
-                .fill(Color.black.opacity(0.6))
-                .mask {
-                    Rectangle()
-                        .overlay {
-                            Circle()
-                                .frame(width: diameter, height: diameter)
-                                .blendMode(.destinationOut)
-                        }
-                        .compositingGroup()
-                }
+            // One filled path with an even-odd rule, rather than masking with
+            // `.blendMode(.destinationOut)`: the blend needs an offscreen
+            // buffer for the full screen, and it was being composited again on
+            // every frame of every drag.
+            CircleCutout(diameter: diameter)
+                .fill(Color.black.opacity(0.6), style: FillStyle(eoFill: true))
 
             Circle()
                 .strokeBorder(Color.white.opacity(0.9), lineWidth: 1)
@@ -122,12 +136,16 @@ struct AvatarCropView: View {
         .allowsHitTesting(false)
     }
 
-    private func controls(diameter: CGFloat) -> some View {
+    // The container ignores the safe area, so the insets are applied here by
+    // hand. The floors matter more than the insets do: if this ever ends up
+    // somewhere the insets read as zero, the title still clears a Dynamic
+    // Island and the buttons still clear the home indicator.
+    private func controls(diameter: CGFloat, insets: EdgeInsets) -> some View {
         VStack {
             Text("Move and Scale")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white)
-                .padding(.top, AppTheme.spacingLG)
+                .padding(.top, max(insets.top, 56) + AppTheme.spacingSM)
 
             Spacer()
 
@@ -145,7 +163,7 @@ struct AvatarCropView: View {
             }
             .font(.body)
             .padding(.horizontal, AppTheme.spacingXL)
-            .padding(.bottom, AppTheme.spacingLG)
+            .padding(.bottom, max(insets.bottom, AppTheme.spacingXL) + AppTheme.spacingSM)
         }
     }
 
@@ -243,6 +261,23 @@ struct AvatarCropView: View {
                 height: display.height * toOutput
             ))
         }
+    }
+}
+
+// The whole area with a circle taken out of the middle. Filled even-odd, the
+// circle is the hole.
+private struct CircleCutout: Shape {
+    let diameter: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        path.addEllipse(in: CGRect(
+            x: rect.midX - diameter / 2,
+            y: rect.midY - diameter / 2,
+            width: diameter,
+            height: diameter
+        ))
+        return path
     }
 }
 
