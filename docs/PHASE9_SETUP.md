@@ -90,6 +90,8 @@ Dashboard → **Database** → **Webhooks** → **Create a new hook**.
 
 The header is the only thing standing between this function and the open internet, so double-check it saved. Without it — or with it wrong — every call returns 401 and nothing is delivered.
 
+⚠️ **If saving fails with `ERROR: 3F000: schema "supabase_functions" does not exist`,** webhooks have never been turned on for this project. That schema is created by the enable step, not by the migration. Database → Webhooks → **Enable webhooks** (it also enables `pg_net`, which is what actually sends the request), then create the hook again. Database Webhooks are a wrapper around a `pg_net` trigger, so nothing works until the extension is in place.
+
 ## What to test
 
 Needs **two accounts on two devices**, same as every friend feature, and **a real iPhone** — the Simulator has no APNs connection and will never receive a push. (The rest of the app still runs fine there; registration just fails quietly, which is what the `[Foodie] remote notification registration failed` line in the console is.)
