@@ -78,11 +78,11 @@ struct FullScreenImageView: View {
                 // enough to dismiss still reads as "this closes".
                 .scaleEffect(photoScale)
 
-            // The other half of that: dimming toward the black behind, rather
-            // than fading the photo itself. `.opacity` on a view this size
-            // forces an offscreen buffer that is recomposited on every frame
-            // of the drag; a flat colour on top costs nothing and looks the
-            // same against a black background.
+            // The other half of that: dimming toward the black behind rather
+            // than fading the photo itself, which against a black background
+            // looks the same and costs a great deal less — `.opacity` on a
+            // view this size needs an offscreen buffer, recomposited on every
+            // frame of the drag.
             Color.black
                 .opacity(dragDimming)
                 .ignoresSafeArea()
@@ -181,10 +181,9 @@ struct FullScreenImageView: View {
         1 - dragProgress * 0.12
     }
 
-    // Converted rather than left as arithmetic at the call site: `dragProgress`
-    // is a CGFloat and `opacity` takes a Double, and with a literal in the
-    // middle the compiler can read `Double(dragProgress) * 0.5` two ways and
-    // refuses to pick.
+    // Named and converted rather than written inline: `dragProgress` is a
+    // CGFloat, `opacity` takes a Double, and mixing the two with a literal in
+    // between is ambiguous enough that the compiler won't choose.
     private var dragDimming: Double {
         Double(dragProgress) * 0.5
     }

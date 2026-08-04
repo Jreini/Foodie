@@ -3,19 +3,20 @@ import UIKit
 
 // A photo you can pinch and pan, backed by a UIScrollView.
 //
-// This is UIKit deliberately, after two attempts at doing it with SwiftUI
-// gestures. Driving zoom and pan from `DragGesture`/`MagnifyGesture` means
-// writing `@State` on every touch event, and every write re-runs the view body
-// and re-renders the image at its magnified size. On a real device that showed
-// up as a photo that didn't move *at all* while a finger was dragging and then
-// jumped when it stopped — the main thread never got far enough ahead to draw
-// an intermediate frame.
+// UIKit deliberately, and it should stay that way. Driving zoom and pan from
+// `DragGesture`/`MagnifyGesture` means writing `@State` on every touch event,
+// and every write re-runs the view body and re-renders the image at its
+// magnified size. That doesn't degrade into dropped frames — on a real device
+// the photo doesn't move at all while a finger drags, then jumps when it
+// stops, because the main thread never gets far enough ahead to draw an
+// intermediate frame.
 //
 // A UIScrollView pans by moving its own bounds, which is compositing and
 // nothing else, and it brings rubber-banding, momentum, correct pinch
 // anchoring and double-tap zoom with it. None of that touches SwiftUI state
 // while it moves: the callbacks below fire when it settles, and when the
-// answer actually changes.
+// answer actually changes. A callback that fired per frame would put the whole
+// problem back.
 struct ZoomableImageScrollView: UIViewRepresentable {
 
     // How the photo sits when it hasn't been zoomed.
