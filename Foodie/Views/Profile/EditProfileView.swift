@@ -26,6 +26,14 @@ struct EditProfileView: View {
     @State private var showAvatarOptions = false
     @State private var isPreparingPhoto = false
 
+    // Every new photo goes through the cropper before it becomes the pending
+    // change, whichever way it arrived.
+    @State private var photoToCrop: CroppablePhoto?
+    // A camera capture waits here until its own sheet has gone. Presenting the
+    // cropper from inside `onCapture` puts a second full-screen cover up while
+    // the first is still dismissing, and SwiftUI drops it.
+    @State private var capturedPhoto: UIImage?
+
     // Same reason as the review composer: Return inserts a newline in a
     // TextEditor, so there's no built-in way to put the keyboard away.
     @FocusState private var isBioFocused: Bool
@@ -33,6 +41,14 @@ struct EditProfileView: View {
     private enum AvatarChange {
         case picked(UIImage)
         case removed
+    }
+
+    // `.fullScreenCover(item:)` needs an Identifiable, and a UIImage isn't one.
+    // The fresh id also means picking the same photo twice still presents the
+    // cropper the second time.
+    private struct CroppablePhoto: Identifiable {
+        let id = UUID()
+        let image: UIImage
     }
 
     var body: some View {
@@ -120,11 +136,21 @@ struct EditProfileView: View {
                 selection: $pickerSelection,
                 matching: .images
             )
-            .fullScreenCover(isPresented: $showCamera) {
+            .fullScreenCover(isPresented: $showCamera, onDismiss: presentCropperForCapture) {
                 CameraPicker { image in
-                    avatarChange = .picked(image)
+                    capturedPhoto = image
                 }
                 .ignoresSafeArea()
+            }
+            .fullScreenCover(item: $photoToCrop) { photo in
+                AvatarCropView(
+                    image: photo.image,
+                    onCancel: { photoToCrop = nil },
+                    onConfirm: { cropped in
+                        avatarChange = .picked(cropped)
+                        photoToCrop = nil
+                    }
+                )
             }
             .onChange(of: pickerSelection) { _, item in
                 Task { await loadPickedPhoto(item) }
@@ -206,10 +232,17 @@ struct EditProfileView: View {
 
         if let data = try? await item.loadTransferable(type: Data.self),
            let image = UIImage(data: data) {
-            avatarChange = .picked(image)
+            photoToCrop = CroppablePhoto(image: image)
         } else {
             saveError = "That photo couldn't be opened. Try another."
         }
+    }
+
+    // Runs once the camera sheet is actually gone — see `capturedPhoto`.
+    private func presentCropperForCapture() {
+        guard let capturedPhoto else { return }
+        self.capturedPhoto = nil
+        photoToCrop = CroppablePhoto(image: capturedPhoto)
     }
 
     // MARK: - Saving
