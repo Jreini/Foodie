@@ -281,6 +281,14 @@ final class AuthManager {
     func signOut() async {
         errorMessage = nil
         do {
+            // Detach this device before the session goes: the delete policy
+            // matches on the caller's own id, so afterwards nobody has
+            // permission to remove the row — and it would keep receiving this
+            // account's notifications on a phone they've signed out of.
+            await PushNotificationService.shared.unregisterCurrentToken()
+            // Anything still pending was addressed to the account that's leaving.
+            PushRouter.shared.clear()
+
             try await SupabaseService.client.auth.signOut()
             // Clears Google's cached account so the next sign-in shows the
             // picker instead of silently reusing the last account.

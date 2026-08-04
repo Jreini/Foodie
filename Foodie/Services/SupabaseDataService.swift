@@ -15,6 +15,10 @@ struct SupabaseDataService: DataServiceProtocol {
     // One screenful plus headroom, so the first page rarely needs a second.
     static let feedPageSize = 30
 
+    // The inbox doesn't paginate: read rows are pruned after 30 days, so this
+    // is far more history than anyone accumulates.
+    static let notificationPageSize = 50
+
     private func currentUserId() throws -> UUID {
         guard let id = client.auth.currentUser?.id else {
             throw DataServiceError.notSignedIn
@@ -541,6 +545,85 @@ struct SupabaseDataService: DataServiceProtocol {
             .value
     }
 
+    // MARK: - Notifications
+
+    func fetchNotifications() async throws -> [AppNotification] {
+        // No recipient filter: the SELECT policy already limits this to the
+        // caller's own rows.
+        let rows: [NotificationRow] = try await client
+            .from("notifications")
+            .select()
+            .order("created_at", ascending: false)
+            .limit(Self.notificationPageSize)
+            .execute()
+            .value
+
+        guard !rows.isEmpty else { return [] }
+
+        // Actors are hydrated from `profiles` rather than read from the stored
+        // payload, so a row shows what someone is called now — not what they
+        // were called when they sent the request.
+        let profiles = try await fetchProfiles(ids: rows.compactMap(\.actorId))
+        let usersById = Dictionary(
+            uniqueKeysWithValues: profiles.map { ($0.id, $0.user(friendIds: [])) }
+        )
+
+        return rows.compactMap { row in
+            row.notification(actor: row.actorId.flatMap { usersById[$0] })
+        }
+    }
+
+    func unreadNotificationCount() async throws -> Int {
+        // HEAD with an exact count: the badge needs the number, never the rows,
+        // and this is backed by the partial index on unread notifications.
+        let response = try await client
+            .from("notifications")
+            .select("id", head: true, count: .exact)
+            .is("read_at", value: nil)
+            .execute()
+
+        return response.count ?? 0
+    }
+
+    func markNotificationsRead(ids: [UUID]) async throws {
+        guard !ids.isEmpty else { return }
+
+        // `read_at` is the only column `authenticated` holds an UPDATE grant on,
+        // so this is the only shape of update the server will accept here.
+        //
+        // `.minimal` because the rows are already on screen — the default sends
+        // all of them back over the wire to be thrown away.
+        try await client
+            .from("notifications")
+            .update(NotificationRead(readAt: Date()), returning: .minimal)
+            .in("id", values: ids)
+            .execute()
+    }
+
+    // MARK: - Devices
+
+    func registerDeviceToken(_ token: String, isSandbox: Bool) async throws {
+        // An RPC rather than an upsert: the row may still belong to whoever was
+        // signed in on this phone before, and no policy that checks ownership
+        // could ever let us take it. The function always writes auth.uid(), so
+        // a caller can only ever claim a token for themselves.
+        try await client
+            .rpc(
+                "register_device_token",
+                params: RegisterDeviceTokenParams(deviceToken: token, sandbox: isSandbox)
+            )
+            .execute()
+    }
+
+    func unregisterDeviceToken(_ token: String) async throws {
+        // Ordinary delete, gated by the policy: you can only remove your own.
+        try await client
+            .from("device_tokens")
+            .delete()
+            .eq("token", value: token)
+            .execute()
+    }
+
     // MARK: - Writes
 
     @discardableResult
@@ -808,6 +891,73 @@ private struct FriendshipAccept: Encodable {
     enum CodingKeys: String, CodingKey {
         case status
         case respondedAt = "responded_at"
+    }
+}
+
+// MARK: - Notification Rows
+
+private struct NotificationRow: Decodable {
+    let id: UUID
+    let actorId: UUID?
+    let type: String
+    let payload: Payload
+    let createdAt: Date
+    let readAt: Date?
+
+    // The jsonb column. Every field is optional because each notification type
+    // carries different context — and `{}` is the column default, which is what
+    // the two friend types store.
+    struct Payload: Decodable {
+        let listId: UUID?
+        let listName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case listId = "list_id"
+            case listName = "list_name"
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, payload
+        case actorId = "actor_id"
+        case createdAt = "created_at"
+        case readAt = "read_at"
+    }
+
+    // Nil for a type this build doesn't recognise — the same treatment
+    // `FriendshipRow` gives an unknown status. A newer app version will show it.
+    func notification(actor: User?) -> AppNotification? {
+        guard let kind = AppNotification.Kind(rawValue: type) else { return nil }
+
+        return AppNotification(
+            id: id,
+            actor: actor,
+            kind: kind,
+            listId: payload.listId,
+            listName: payload.listName,
+            createdAt: createdAt,
+            readAt: readAt
+        )
+    }
+}
+
+private struct NotificationRead: Encodable {
+    let readAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case readAt = "read_at"
+    }
+}
+
+private struct RegisterDeviceTokenParams: Encodable {
+    let deviceToken: String
+    let sandbox: Bool
+
+    // Must match the function's argument names — PostgREST maps RPC parameters
+    // by name, not position.
+    enum CodingKeys: String, CodingKey {
+        case sandbox
+        case deviceToken = "device_token"
     }
 }
 

@@ -21,6 +21,10 @@ class FeedViewModel {
     // limits it to the caller's own edges.
     private(set) var pendingRequestCount = 0
 
+    // Badges the bell. Counted server-side so this stays one cheap query rather
+    // than loading an inbox nobody has opened.
+    private(set) var unreadNotificationCount = 0
+
     private let dataService: any DataServiceProtocol
     private var currentUserId: UUID?
 
@@ -44,17 +48,32 @@ class FeedViewModel {
             activities = page
             hasMore = !page.isEmpty
 
-            await loadPendingRequestCount(for: currentUser.id)
+            await loadBadgeCounts(for: currentUser.id)
         } catch {
             errorMessage = DataLoadFailure.message(for: error)
         }
     }
 
-    // Deliberately swallows its error: a badge that can't be counted is worth
-    // nothing, and failing the whole feed over it would be absurd.
-    private func loadPendingRequestCount(for userId: UUID) async {
-        guard let friendships = try? await dataService.fetchFriendships() else { return }
-        pendingRequestCount = friendships.filter { $0.isIncomingRequest(for: userId) }.count
+    // Re-counts only the badges, for coming back to the Feed after reading the
+    // inbox or answering a request. The feed itself is deliberately left alone:
+    // the activity on screen didn't change because a notification was read, and
+    // reloading it would scroll the user back to the top for nothing.
+    func refreshBadges() async {
+        guard let currentUserId else { return }
+        await loadBadgeCounts(for: currentUserId)
+    }
+
+    // Both badges, deliberately swallowing their errors: a badge that can't be
+    // counted is worth nothing, and failing the whole feed over one would be
+    // absurd. Run concurrently — neither depends on the other, and this happens
+    // after the feed itself is already on screen.
+    private func loadBadgeCounts(for userId: UUID) async {
+        async let friendships = try? await dataService.fetchFriendships()
+        async let unread = try? await dataService.unreadNotificationCount()
+
+        let edges = await friendships ?? []
+        pendingRequestCount = edges.filter { $0.isIncomingRequest(for: userId) }.count
+        unreadNotificationCount = await unread ?? 0
     }
 
     // Pages backwards from the oldest row on screen. Keyset rather than offset,

@@ -348,6 +348,46 @@ class MockDataService: DataServiceProtocol {
         return activities.sorted { $0.timestamp > $1.timestamp }
     }()
 
+    // MARK: - Notifications
+
+    // One of each kind, and one already read, so the inbox preview shows both
+    // states and every row layout.
+    lazy var notifications: [AppNotification] = {
+        let mia = users.first { $0.id == Self.friend1Id }
+        let alex = users.first { $0.id == Self.friend2Id }
+        let sam = users.first { $0.id == Self.friend3Id }
+
+        return [
+            AppNotification(
+                id: UUID(),
+                actor: mia,
+                kind: .friendRequest,
+                listId: nil,
+                listName: nil,
+                createdAt: hoursAgo(1),
+                readAt: nil
+            ),
+            AppNotification(
+                id: UUID(),
+                actor: alex,
+                kind: .listAdded,
+                listId: UUID(),
+                listName: "Taco Tour",
+                createdAt: hoursAgo(5),
+                readAt: nil
+            ),
+            AppNotification(
+                id: UUID(),
+                actor: sam,
+                kind: .friendAccepted,
+                listId: nil,
+                listName: nil,
+                createdAt: daysAgo(2),
+                readAt: daysAgo(2)
+            ),
+        ]
+    }()
+
     // MARK: - Protocol Methods
     //
     // Everything is `async throws` to match the live service. None of it
@@ -622,6 +662,38 @@ class MockDataService: DataServiceProtocol {
     func deleteAccount() async throws {
         // Nothing to delete in memory; previews never have a real account.
     }
+
+    // MARK: - Notifications
+
+    func fetchNotifications() async throws -> [AppNotification] {
+        notifications
+    }
+
+    func unreadNotificationCount() async throws -> Int {
+        notifications.filter(\.isUnread).count
+    }
+
+    func markNotificationsRead(ids: [UUID]) async throws {
+        let now = Date()
+        notifications = notifications.map { notification in
+            guard ids.contains(notification.id), notification.isUnread else { return notification }
+            return AppNotification(
+                id: notification.id,
+                actor: notification.actor,
+                kind: notification.kind,
+                listId: notification.listId,
+                listName: notification.listName,
+                createdAt: notification.createdAt,
+                readAt: now
+            )
+        }
+    }
+
+    // MARK: - Devices
+
+    // Previews have no APNs connection and no session to register against.
+    func registerDeviceToken(_ token: String, isSandbox: Bool) async throws {}
+    func unregisterDeviceToken(_ token: String) async throws {}
 
     @discardableResult
     func submitReview(
