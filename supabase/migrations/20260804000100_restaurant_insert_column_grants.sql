@@ -1,0 +1,93 @@
+-- =============================================================================
+-- Foodie — a client may create a restaurant, but not its reputation
+-- =============================================================================
+-- Follow-up to `20260803000300_fix_insert_policy_gaps.sql`, which closed the
+-- same shape of hole on `friendships` and `list_members` and deliberately left
+-- this one for its own change.
+--
+-- `"Authenticated users can add restaurants"` checks `auth.uid() = created_by`
+-- and stops there. RLS chooses which ROWS a policy applies to and has nothing
+-- to say about which COLUMNS, so every column the policy doesn't mention is
+-- writable on insert — including `average_rating`, `average_tier` and
+-- `review_count`, which are maintained by `refresh_restaurant_aggregates()`.
+-- A crafted insert could seed a brand-new place with a five-star average and a
+-- review count it never earned, and the app has no way to tell that apart from
+-- a genuinely popular restaurant.
+--
+-- The window is narrow but real: there is no UPDATE policy, so this is only
+-- reachable on the row's first insert, and the aggregate trigger corrects the
+-- values the moment anyone actually reviews the place. It is worth closing
+-- anyway, because "the app only ever sends the defaults" is a habit of our own
+-- client, not a control — the publishable key ships inside the binary and
+-- PostgREST accepts whatever columns the caller names.
+--
+-- Column privileges are the right tool, exactly as `notifications` uses them
+-- for `read_at` (`20260803000200`). Nothing here touches existing rows or the
+-- policy itself; grants govern future statements only.
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- restaurants — grant insert on the columns a client legitimately supplies
+-- -----------------------------------------------------------------------------
+-- Checked against `RestaurantInsert` in `SupabaseDataService.swift`, which is
+-- the only thing in the app that writes this table (via
+-- `ensureRestaurantPersisted`, the hottest write path there is — every review,
+-- like and tasting-list add resolves the place through it first). It encodes
+-- mapkit_place_id, name, cuisine, address, latitude, longitude, baseline_tier
+-- and created_by. `price_level` is granted as well: nothing sends it today
+-- because MapKit doesn't report a price, but it is ordinary descriptive data
+-- rather than a crowd column, and leaving it out would turn "start recording
+-- price" into a mysterious 403 on the app's busiest write.
+--
+-- Deliberately NOT granted, and why each one is safe to withhold:
+--
+--   average_rating, average_tier, review_count — the point of this migration.
+--       Trigger-maintained, and their column defaults (0, 0.5, 0) are exactly
+--       what a brand-new place should have.
+--   id, created_at — defaulted, and the client has never sent either. The
+--       upsert conflicts on `mapkit_place_id`, so identity is the database's
+--       to decide; `PlaceSearchService.derivedId` is a client-side handle, not
+--       a column.
+--   tags, hours_description, is_open_now — nullable or defaulted leftovers
+--       from the pre-MapKit schema that nothing writes any more.
+--
+-- If a future write path needs one of those, extend this grant in a new
+-- migration rather than dropping back to a table-level grant.
+revoke insert on public.restaurants from authenticated;
+
+grant insert (mapkit_place_id, name, cuisine, address, latitude, longitude,
+              price_level, baseline_tier, created_by)
+    on public.restaurants to authenticated;
+
+-- `anon` is untouched on purpose. It keeps its table-level grant and still
+-- can't insert a thing, because the INSERT policy is `to authenticated` and a
+-- table with RLS enabled and no matching policy denies the action outright.
+-- Narrowing a privilege that no policy lets anyone use would read as security
+-- and buy nothing.
+
+-- -----------------------------------------------------------------------------
+-- Verifying
+-- -----------------------------------------------------------------------------
+-- After applying, this should list exactly the nine granted columns:
+--
+--   select column_name
+--   from information_schema.column_privileges
+--   where table_schema = 'public'
+--     and table_name = 'restaurants'
+--     and grantee = 'authenticated'
+--     and privilege_type = 'INSERT'
+--   order by column_name;
+--
+-- And this should come back empty — no table-wide INSERT left on the role:
+--
+--   select grantee, privilege_type
+--   from information_schema.role_table_grants
+--   where table_schema = 'public'
+--     and table_name = 'restaurants'
+--     and grantee = 'authenticated'
+--     and privilege_type = 'INSERT';
+--
+-- The check that actually matters is on a device: add a place that isn't in
+-- the database yet to a tasting list, like it, and review it. All three call
+-- `ensureRestaurantPersisted` first, so if the column list were wrong they
+-- would fail together with a 403.

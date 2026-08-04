@@ -129,7 +129,11 @@ struct ProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: AppTheme.spacingMD) {
-            ProfileImageView(avatarPath: auth.profile?.avatarPath, size: 80)
+            ProfileImageView(
+                avatarPath: auth.profile?.avatarPath,
+                size: 80,
+                opensFullScreen: true
+            )
 
             VStack(spacing: AppTheme.spacingXS) {
                 Text(auth.profile?.displayName ?? "")
