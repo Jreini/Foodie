@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // What to show full screen, and which image to open on.
 //
@@ -101,10 +102,10 @@ struct FullScreenImageView: View {
 
     // MARK: - Pages
 
-    // One photo gets no scroll view, and that is a fix rather than a saving.
-    // A UIScrollView holds onto touches before passing them to its content, so
-    // a pan that starts inside one begins late and reads as the image dragging
-    // behind the finger. Every avatar and most reviews take this path.
+    // A single photo skips the pager entirely rather than being a one-page
+    // scroll view inside another scroll view. Every avatar and most reviews
+    // take this path, and it keeps the common case free of any nested
+    // scrolling for a swipe to be handed between.
     @ViewBuilder
     private var content: some View {
         if source.urls.count == 1, let url = source.urls.first {
@@ -213,63 +214,33 @@ struct FullScreenImageView: View {
 
 // MARK: - One page
 
-// A single zoomable, pannable photo.
+// A single photo: loaded here, zoomed and panned by the scroll view.
 //
-// Zoom state is per page: paging away from a photo and coming back should show
-// it fitted again, not still magnified on the corner you left it at.
+// The bytes are fetched directly rather than through `AsyncImage` because the
+// zoom needs a `UIImage` and AsyncImage only ever hands back a SwiftUI `Image`.
+// It costs no extra traffic — `URLSession.shared` reads the same shared cache
+// AsyncImage does, and the thumbnail that was tapped to get here has already
+// filled it.
 private struct ZoomablePage: View {
     let url: URL
     // Written on the way up so the pager can lock its swipe while this page is
     // zoomed in.
     @Binding var isZoomed: Bool
 
-    @State private var scale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    // The values the last gesture ended on. A pinch reports magnification
-    // relative to its own start, so without these every new pinch would jump
-    // back to 1×.
-    @State private var committedScale: CGFloat = 1
-    @State private var committedOffset: CGSize = .zero
-
-    private let maxScale: CGFloat = 4
-    private let doubleTapScale: CGFloat = 2.5
+    @State private var image: UIImage?
+    @State private var failed = false
 
     var body: some View {
-        GeometryReader { proxy in
-            // Color.clear rather than gestures on the image itself: a photo is
-            // letterboxed inside the page, and pinching the black beside it
-            // should still zoom.
-            ZStack {
-                Color.clear
-                image(in: proxy.size)
-            }
-            .contentShape(Rectangle())
-            .gesture(magnify(in: proxy.size))
-            // Panning exists only while zoomed. Left attached the rest of the
-            // time it would swallow the pager's swipe and drag-to-dismiss.
-            .gesture(pan(in: proxy.size), isEnabled: committedScale > 1)
-            .onTapGesture(count: 2) { location in
-                toggleZoom(toward: location, in: proxy.size)
-            }
-        }
-        // Belt and braces for the LazyHStack, which may keep a neighbouring
-        // page alive off-screen.
-        .onDisappear { resetZoom() }
-    }
-
-    @ViewBuilder
-    private func image(in size: CGSize) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(scale)
-                    .offset(offset)
-            case .failure:
+        Group {
+            if let image {
+                ZoomableImageScrollView(
+                    image: image,
+                    layout: .fit,
+                    onZoomedChanged: { isZoomed = $0 }
+                )
+            } else if failed {
                 unavailable
-            default:
+            } else {
                 // Unlike the thumbnails, a full-screen photo is worth a
                 // spinner — it's the only thing on screen, and there's nothing
                 // else to look at while it loads.
@@ -278,8 +249,7 @@ private struct ZoomablePage: View {
                     .tint(.white)
             }
         }
-        .frame(width: size.width, height: size.height)
-        .accessibilityLabel("Photo")
+        .task(id: url) { await load() }
     }
 
     private var unavailable: some View {
@@ -292,99 +262,20 @@ private struct ZoomablePage: View {
         .foregroundStyle(.white.opacity(0.7))
     }
 
-    // MARK: - Gestures
-
-    private func magnify(in size: CGSize) -> some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let newScale = min(max(committedScale * value.magnification, 1), maxScale)
-                // Zoom around the pinch rather than the middle of the photo, so
-                // pinching the corner of a plate brings the plate closer
-                // instead of the centre of the table. Same behaviour as the
-                // double tap, which has always aimed at where it was tapped.
-                let anchored = anchoredOffset(
-                    pinchedAt: value.startLocation,
-                    in: size,
-                    from: committedScale,
-                    to: newScale,
-                    offset: committedOffset
-                )
-                scale = newScale
-                offset = clamped(anchored, at: newScale, in: size)
-            }
-            .onEnded { _ in
-                if scale <= 1 {
-                    withAnimation(.snappy(duration: 0.2)) { resetZoom() }
-                } else {
-                    committedScale = scale
-                    committedOffset = offset
-                    isZoomed = true
-                }
-            }
-    }
-
-    private func pan(in size: CGSize) -> some Gesture {
-        DragGesture()
-            .onChanged { value in
-                let proposed = CGSize(
-                    width: committedOffset.width + value.translation.width,
-                    height: committedOffset.height + value.translation.height
-                )
-                offset = clamped(proposed, at: scale, in: size)
-            }
-            .onEnded { _ in committedOffset = offset }
-    }
-
-    // Zooms toward the tap rather than the middle, so double-tapping the plate
-    // in the corner of a photo brings the plate in, not the centre of the
-    // table. `scaleEffect` anchors at the centre and `offset` is applied after
-    // it, so a point v away from the centre lands at scale * v — putting it in
-    // the middle means offsetting by exactly that, then clamping.
-    private func toggleZoom(toward point: CGPoint, in size: CGSize) {
-        withAnimation(.snappy(duration: 0.25)) {
-            if committedScale > 1 {
-                resetZoom()
+    private func load() async {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let decoded = UIImage(data: data) {
+                image = decoded
             } else {
-                let fromCentre = CGSize(
-                    width: point.x - size.width / 2,
-                    height: point.y - size.height / 2
-                )
-                scale = doubleTapScale
-                offset = clamped(
-                    CGSize(width: -doubleTapScale * fromCentre.width,
-                           height: -doubleTapScale * fromCentre.height),
-                    at: doubleTapScale,
-                    in: size
-                )
-                committedScale = scale
-                committedOffset = offset
-                isZoomed = true
+                failed = true
             }
+        } catch {
+            // A cancelled task is this page being torn down, not a photo that
+            // couldn't be loaded — saying so would flash an error on the way
+            // out of the viewer.
+            if !Task.isCancelled { failed = true }
         }
-    }
-
-    private func resetZoom() {
-        scale = 1
-        committedScale = 1
-        offset = .zero
-        committedOffset = .zero
-        isZoomed = false
-    }
-
-    // Keeps a zoomed photo from being dragged off into the dark.
-    //
-    // Measured against the page rather than the photo, because `scaledToFit`
-    // letterboxes and AsyncImage never hands back the size it settled on. The
-    // cost is that a tall photo on a wide screen can travel a little past its
-    // own edge; the alternative is decoding the image twice to find out how
-    // big it is.
-    private func clamped(_ offset: CGSize, at scale: CGFloat, in size: CGSize) -> CGSize {
-        let limitX = max(size.width * (scale - 1) / 2, 0)
-        let limitY = max(size.height * (scale - 1) / 2, 0)
-        return CGSize(
-            width: min(max(offset.width, -limitX), limitX),
-            height: min(max(offset.height, -limitY), limitY)
-        )
     }
 }
 
