@@ -104,4 +104,5 @@ private struct ProfileUnavailableView: View {
 #Preview {
     RootView()
         .environment(AuthManager())
+        .environment(PushRouter.shared)
 }

@@ -116,6 +116,30 @@ protocol DataServiceProtocol {
         tierPlacement: RestaurantTier
     ) async throws -> Review
 
+    // MARK: - Notifications
+
+    // The signed-in user's inbox, newest first. No `for userId:` parameter —
+    // RLS returns only your own, and there is no legitimate reason to ask for
+    // anyone else's.
+    func fetchNotifications() async throws -> [AppNotification]
+
+    // Counted server-side rather than by loading the inbox, because the badge
+    // is drawn on a screen that has no other reason to fetch notifications.
+    func unreadNotificationCount() async throws -> Int
+
+    func markNotificationsRead(ids: [UUID]) async throws
+
+    // MARK: - Devices
+
+    // Claims an APNs token for the signed-in user. `isSandbox` records which
+    // Apple host the token belongs to — a debug build's token is rejected by
+    // the production one and vice versa.
+    func registerDeviceToken(_ token: String, isSandbox: Bool) async throws
+
+    // Detaches a token on sign-out, so the next account on this phone doesn't
+    // inherit the last one's notifications.
+    func unregisterDeviceToken(_ token: String) async throws
+
     // MARK: - Account
 
     // Removes the account and everything owned by it. Irreversible, and

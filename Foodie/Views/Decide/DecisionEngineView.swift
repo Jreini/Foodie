@@ -14,8 +14,14 @@ enum DecideRoute: Hashable {
 }
 
 struct DecisionEngineView: View {
+    @Environment(PushRouter.self) private var router
+
+    // Bound so a tapped "added you to a list" notification can push Shared
+    // Lists, which lives in this tab rather than the one the bell is on.
+    @State private var path = NavigationPath()
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: AppTheme.spacingLG) {
                     Text("Can't decide where to eat?")
@@ -87,7 +93,21 @@ struct DecisionEngineView: View {
                 RestaurantDetailView(restaurant: restaurant)
             }
             .personProfileDestination()
+            .onAppear { consumePendingRoute() }
+            .onChange(of: router.destination) { consumePendingRoute() }
         }
+    }
+
+    // Claims only the Shared Lists route; anything else stays pending for the
+    // tab that can show it.
+    private func consumePendingRoute() {
+        guard router.consume(.sharedLists) else { return }
+
+        // Replaces whatever was open rather than stacking on top of it — the
+        // notification is a fresh instruction, not a continuation of wherever
+        // this tab happened to be left.
+        path = NavigationPath()
+        path.append(DecideRoute.sharedLists)
     }
 }
 
@@ -137,4 +157,5 @@ private struct DecisionOptionCard: View {
 
 #Preview {
     DecisionEngineView()
+        .environment(PushRouter.shared)
 }

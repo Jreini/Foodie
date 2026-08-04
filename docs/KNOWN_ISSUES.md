@@ -2,6 +2,8 @@
 
 Open bugs with what's already been ruled out, so the next attempt doesn't repeat the last one.
 
+Work that hasn't been started — follow-ups, cleanup, the outstanding security fix — is in [`BACKLOG.md`](BACKLOG.md) instead. This file is only for things that are broken.
+
 ---
 
 ## Shared list emoji renders as a missing-glyph box on a second device
