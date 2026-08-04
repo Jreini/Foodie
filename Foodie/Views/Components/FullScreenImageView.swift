@@ -75,8 +75,8 @@ struct FullScreenImageView: View {
                 .offset(y: dismissOffset)
                 // The photo shrinks and fades as it's dragged, so a drag that
                 // isn't far enough to dismiss still reads as "this closes".
-                .scaleEffect(1 - dragProgress * 0.12)
-                .opacity(1 - dragProgress * 0.5)
+                .scaleEffect(photoScale)
+                .opacity(photoOpacity)
         }
         .overlay(alignment: .topTrailing) { closeButton }
         .overlay(alignment: .bottom) { pageIndicator }
@@ -143,7 +143,7 @@ struct FullScreenImageView: View {
                 .padding(.vertical, AppTheme.spacingXS)
                 .background(.ultraThinMaterial, in: Capsule())
                 .padding(.bottom, AppTheme.spacingXL)
-                .opacity(1 - dragProgress)
+                .opacity(chromeOpacity)
         }
     }
 
@@ -151,6 +151,22 @@ struct FullScreenImageView: View {
 
     private var dragProgress: CGFloat {
         min(abs(dismissOffset) / 300, 1)
+    }
+
+    private var photoScale: CGFloat {
+        1 - dragProgress * 0.12
+    }
+
+    // Converted rather than left as arithmetic at the call site: `dragProgress`
+    // is a CGFloat and `opacity` takes a Double, and with a literal in the
+    // middle the compiler can read `1 - dragProgress * 0.5` two ways and
+    // refuses to pick.
+    private var photoOpacity: Double {
+        1 - Double(dragProgress) * 0.5
+    }
+
+    private var chromeOpacity: Double {
+        1 - Double(dragProgress)
     }
 
     private var dismissDrag: some Gesture {
