@@ -35,7 +35,7 @@ struct UserProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: AppTheme.spacingMD) {
-            ProfileImageView(user: viewModel.user, size: 80)
+            ProfileImageView(user: viewModel.user, size: 80, opensFullScreen: true)
 
             VStack(spacing: AppTheme.spacingXS) {
                 Text(viewModel.user.name)
