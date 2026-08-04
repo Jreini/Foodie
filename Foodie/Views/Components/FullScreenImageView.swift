@@ -274,8 +274,20 @@ private struct ZoomablePage: View {
     private func magnify(in size: CGSize) -> some Gesture {
         MagnifyGesture()
             .onChanged { value in
-                scale = min(max(committedScale * value.magnification, 1), maxScale)
-                offset = clamped(committedOffset, at: scale, in: size)
+                let newScale = min(max(committedScale * value.magnification, 1), maxScale)
+                // Zoom around the pinch rather than the middle of the photo, so
+                // pinching the corner of a plate brings the plate closer
+                // instead of the centre of the table. Same behaviour as the
+                // double tap, which has always aimed at where it was tapped.
+                let anchored = anchoredOffset(
+                    pinchedAt: value.startLocation,
+                    in: size,
+                    from: committedScale,
+                    to: newScale,
+                    offset: committedOffset
+                )
+                scale = newScale
+                offset = clamped(anchored, at: newScale, in: size)
             }
             .onEnded { _ in
                 if scale <= 1 {
