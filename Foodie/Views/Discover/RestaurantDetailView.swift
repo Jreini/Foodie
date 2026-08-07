@@ -325,16 +325,6 @@ private struct ReviewCard: View {
     // fetched its own author would issue one request per row.
     let reviewer: User?
 
-    @State private var viewerSource: ImageViewerSource?
-
-    // Resolved once and used for both the row and the viewer, so the index the
-    // viewer opens on always means the photo that was tapped. A path that
-    // doesn't resolve to a URL is dropped from both rather than leaving a hole
-    // in one of them.
-    private var photoURLs: [URL] {
-        review.photoNames.compactMap(PhotoUploadService.publicURL(for:))
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.spacingSM) {
             HStack {
@@ -362,15 +352,7 @@ private struct ReviewCard: View {
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.textPrimary)
 
-            if !photoURLs.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: AppTheme.spacingSM) {
-                        ForEach(Array(photoURLs.enumerated()), id: \.element) { index, url in
-                            reviewPhoto(url, at: index)
-                        }
-                    }
-                }
-            }
+            ReviewPhotoStrip(photoNames: review.photoNames)
 
             if !review.moodTags.isEmpty {
                 MoodTagRow(tags: review.moodTags)
@@ -383,36 +365,6 @@ private struct ReviewCard: View {
         .padding(AppTheme.spacingLG)
         .cardStyle()
         .padding(.horizontal, AppTheme.spacingLG)
-        .fullScreenCover(item: $viewerSource) { source in
-            FullScreenImageView(source: source)
-        }
-    }
-
-    // A 120pt square is a thumbnail of a photo that was uploaded at 1600px, so
-    // there's a lot more of it to see. Tapping opens the whole row, starting
-    // here, rather than this one photo on its own.
-    private func reviewPhoto(_ url: URL, at index: Int) -> some View {
-        Button {
-            viewerSource = ImageViewerSource(urls: photoURLs, startIndex: index)
-        } label: {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFill()
-                case .failure:
-                    Image(systemName: "photo")
-                        .foregroundStyle(AppTheme.textSecondary)
-                default:
-                    ProgressView()
-                }
-            }
-            .frame(width: 120, height: 120)
-            .background(AppTheme.tagBackground)
-            .clipShape(RoundedRectangle(cornerRadius: AppTheme.cornerRadiusSM))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Review photo \(index + 1) of \(photoURLs.count)")
-        .accessibilityHint("Shows the photo full screen")
     }
 }
 
