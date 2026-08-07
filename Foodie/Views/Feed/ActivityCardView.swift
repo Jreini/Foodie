@@ -2,9 +2,15 @@ import SwiftUI
 
 // A single card in the activity feed showing what a friend did.
 //
-// The card holds two links rather than being one: the top row goes to the
-// person, the rest goes to the restaurant. They're siblings, not nested — a
-// `NavigationLink` inside another one doesn't work.
+// The card holds its links side by side rather than being one: the top row goes
+// to the person, the restaurant rows go to the restaurant. They're siblings,
+// not nested — a `NavigationLink` inside another one doesn't work.
+//
+// The photos sit between them for the same reason. They're buttons that open
+// the viewer, and a button inside a link never sees its own tap — so the photo
+// strip has to be a sibling too, which is what splits the restaurant summary
+// into the part above the photos and the tags below them. It keeps the order a
+// review has on the restaurant page: text, photos, tags.
 struct ActivityCardView: View {
     let activity: FriendActivity
 
@@ -19,6 +25,18 @@ struct ActivityCardView: View {
                 restaurantSummary
             }
             .buttonStyle(.plain)
+
+            if let review = activity.associatedReview {
+                ReviewPhotoStrip(photoNames: review.photoNames)
+
+                if !review.moodTags.isEmpty {
+                    NavigationLink(value: activity.restaurant) {
+                        MoodTagRow(tags: review.moodTags)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
         .padding(AppTheme.spacingLG)
         .cardStyle()
@@ -94,11 +112,6 @@ struct ActivityCardView: View {
                     .font(.subheadline)
                     .foregroundStyle(AppTheme.textPrimary)
                     .lineLimit(3)
-            }
-
-            // Mood tags
-            if let review = activity.associatedReview, !review.moodTags.isEmpty {
-                MoodTagRow(tags: review.moodTags)
             }
         }
         // Without this the gaps between the rows aren't part of the link, and
